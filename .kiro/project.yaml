@@ -1,0 +1,12 @@
+name: hdc
+description: HDC (Helmfile Dependency Checker) - A tool to verify that Helm chart dependencies in helmfiles are up-to-date and actively maintained
+version: 0.1.0
+language: go
+type: cli-tool
+
+maintainers:
+  - name: Steffen Rumpf
+
+repository:
+  type: git
+  url: github.com/steffenrumpf/hdc

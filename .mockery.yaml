@@ -1,0 +1,24 @@
+with-expecter: true
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+dir: "{{.InterfaceDir}}/mocks"
+outpkg: mocks
+mockname: "Mock{{.InterfaceName}}"
+filename: "mock_{{.InterfaceName}}.go"
+packages:
+  github.com/steffenrumpf/hdc/internal/parser:
+    interfaces:
+      FileReader:
+      Parser:
+  github.com/steffenrumpf/hdc/internal/repository:
+    interfaces:
+      HTTPClient:
+      Client:
+  github.com/steffenrumpf/hdc/internal/checker:
+    interfaces:
+      RepositoryClient:
+      Checker:
+  github.com/steffenrumpf/hdc/internal/report:
+    interfaces:
+      Writer:

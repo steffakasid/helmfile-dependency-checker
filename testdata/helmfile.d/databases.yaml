@@ -1,0 +1,15 @@
+releases:
+  - name: postgresql
+    namespace: database
+    chart: bitnami/postgresql
+    version: 11.6.0
+
+  - name: redis
+    namespace: cache
+    chart: bitnami/redis
+    version: 16.13.0
+
+  - name: mariadb
+    namespace: database
+    chart: bitnami/mariadb
+    version: 11.5.7

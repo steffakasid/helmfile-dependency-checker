@@ -1,0 +1,10 @@
+releases:
+  - name: nginx-ingress
+    namespace: ingress
+    chart: ingress-nginx/ingress-nginx
+    version: 4.0.1
+
+  - name: cert-manager
+    namespace: cert-manager
+    chart: cert-manager/cert-manager
+    version: 1.10.0

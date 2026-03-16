@@ -1,0 +1,15 @@
+releases:
+  - name: kube-prometheus-stack
+    namespace: {{ .Values.monitoringNamespace | default "monitoring" }}
+    chart: prometheus-community/kube-prometheus-stack
+    version: 45.7.1
+
+  - name: loki
+    namespace: {{ .Values.monitoringNamespace | default "monitoring" }}
+    chart: grafana/loki
+    version: 5.8.0
+
+  - name: grafana
+    namespace: {{ .Values.monitoringNamespace | default "monitoring" }}
+    chart: grafana/grafana
+    version: 6.56.0

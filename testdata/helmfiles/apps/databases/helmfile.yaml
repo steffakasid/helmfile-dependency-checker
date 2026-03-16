@@ -1,0 +1,10 @@
+releases:
+  - name: postgresql
+    namespace: database
+    chart: bitnami/postgresql
+    version: 11.6.0
+
+  - name: redis
+    namespace: cache
+    chart: bitnami/redis
+    version: 16.13.0
