@@ -430,6 +430,73 @@ func TestParse_Integration_SubHelmfiles(t *testing.T) {
 	}
 }
 
+func TestParse_MultiDocumentYAML(t *testing.T) {
+	multiDocContent := `---
+environments:
+  local: {}
+  dev: {}
+  prod: {}
+---
+missingFileHandler: Error
+
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+
+helmfiles:
+  - path: "releases/oauth.yaml"
+  - path: "releases/logging.yaml"
+`
+	oauthYAML := `
+releases:
+  - name: oauth-proxy
+    namespace: auth
+    chart: bitnami/oauth2-proxy
+    version: 4.0.0
+`
+	loggingYAML := `
+releases:
+  - name: fluentbit
+    namespace: logging
+    chart: bitnami/fluent-bit
+    version: 1.0.0
+`
+
+	reader := mocks.NewMockFileReader(t)
+	reader.EXPECT().ReadDir("helmfile.yaml").Return(nil, errors.New("not a dir"))
+	reader.EXPECT().ReadFile("helmfile.yaml").Return([]byte(multiDocContent), nil)
+	reader.EXPECT().ReadFile("releases/oauth.yaml").Return([]byte(oauthYAML), nil)
+	reader.EXPECT().ReadFile("releases/logging.yaml").Return([]byte(loggingYAML), nil)
+
+	hf, err := parser.NewWithReader(reader).Parse("helmfile.yaml")
+	require.NoError(t, err)
+
+	assert.Len(t, hf.Repositories, 1)
+	assert.Equal(t, "bitnami", hf.Repositories[0].Name)
+
+	assert.Len(t, hf.Releases, 2)
+	assert.Equal(t, "oauth-proxy", hf.Releases[0].Name)
+	assert.Equal(t, "fluentbit", hf.Releases[1].Name)
+}
+
+func TestParse_Integration_MultiDocumentYAML(t *testing.T) {
+	p := parser.New()
+	hf, err := p.Parse("../../testdata/helmfiles/helmfile-multidoc.yaml")
+	require.NoError(t, err)
+
+	// The multi-doc file references databases and ingress sub-helmfiles
+	assert.Len(t, hf.Releases, 4)
+
+	releaseNames := make(map[string]bool)
+	for _, r := range hf.Releases {
+		releaseNames[r.Name] = true
+	}
+	assert.True(t, releaseNames["postgresql"])
+	assert.True(t, releaseNames["redis"])
+	assert.True(t, releaseNames["nginx-ingress"])
+	assert.True(t, releaseNames["nginx-internal"])
+}
+
 func TestParse_Integration_OverlappingEntriesDetectedAsCircular(t *testing.T) {
 	// The original testdata helmfile has a glob AND explicit paths that
 	// reference the same files. The visited-path cycle detection treats

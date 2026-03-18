@@ -1,7 +1,10 @@
 package parser
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -104,16 +107,40 @@ func (p *fileParser) parseFileWithVisited(path string, visited map[string]bool) 
 
 	cleaned := templateExpr.ReplaceAll(data, []byte(""))
 
-	var hf models.Helmfile
-	if err := yaml.Unmarshal(cleaned, &hf); err != nil {
-		return nil, fmt.Errorf("failed to parse helmfile %s: %w", path, err)
-	}
-
-	if err := p.resolveSubHelmfiles(&hf, filepath.Dir(path), visited); err != nil {
+	hf, err := decodeMultiDoc(cleaned, path)
+	if err != nil {
 		return nil, err
 	}
 
-	return &hf, nil
+	if err := p.resolveSubHelmfiles(hf, filepath.Dir(path), visited); err != nil {
+		return nil, err
+	}
+
+	return hf, nil
+}
+
+// decodeMultiDoc decodes all YAML documents from data and merges them into
+// a single Helmfile. This supports helmfiles that use --- separators to split
+// environments from the actual helmfile content.
+func decodeMultiDoc(data []byte, path string) (*models.Helmfile, error) {
+	merged := &models.Helmfile{}
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+
+	for {
+		var doc models.Helmfile
+		err := dec.Decode(&doc)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse helmfile %s: %w", path, err)
+		}
+		merged.Repositories = append(merged.Repositories, doc.Repositories...)
+		merged.Releases = append(merged.Releases, doc.Releases...)
+		merged.Helmfiles = append(merged.Helmfiles, doc.Helmfiles...)
+	}
+
+	return merged, nil
 }
 
 // resolveSubHelmfiles normalizes helmfiles: entries, resolves globs,
