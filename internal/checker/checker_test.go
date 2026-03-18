@@ -167,6 +167,12 @@ func TestIsLocalChart_ReturnsFalse(t *testing.T) {
 					Return(newIndex("1.0.0", time.Now()), nil).
 					Maybe()
 			}
+			if strings.HasPrefix(tc.chart, "oci://") {
+				client.EXPECT().
+					FetchOCITags(tc.chart).
+					Return(newIndex("1.0.0", time.Now()), nil).
+					Maybe()
+			}
 
 			chk := checker.New(client, checker.Config{MaxAgeMonths: 12, ConcurrentRequests: 1})
 			result, err := chk.Check(hf)
@@ -313,6 +319,36 @@ func TestCheckOCIRelease_Unreachable(t *testing.T) {
 	assert.Equal(t, models.StatusUnreachable, f.Status)
 	assert.Contains(t, f.Message, "oci://registry.example.com/charts/myapp")
 	assert.Contains(t, f.Message, "connection refused")
+	client.AssertNotCalled(t, "FetchIndex")
+}
+
+func TestCheckOCIRelease_DirectChartField(t *testing.T) {
+	hf := &models.Helmfile{
+		Releases: []models.Release{
+			{Name: "thanos-querier", Chart: "oci://default-docker-3rdparty.bahnhub.tech.rz.db.de/bitnamicharts/thanos", Version: "1.2.0"},
+		},
+	}
+
+	idx := &repository.Index{
+		Entries: map[string][]repository.ChartVersion{
+			"thanos": {{Version: "1.3.0"}, {Version: "1.2.0"}},
+		},
+	}
+
+	client := mocks.NewMockClient(t)
+	client.EXPECT().
+		FetchOCITags("oci://default-docker-3rdparty.bahnhub.tech.rz.db.de/bitnamicharts/thanos").
+		Return(idx, nil)
+
+	chk := checker.New(client, checker.Config{MaxAgeMonths: 12, ConcurrentRequests: 1})
+	result, err := chk.Check(hf)
+	require.NoError(t, err)
+
+	require.Len(t, result.Findings, 1)
+	f := result.Findings[0]
+	assert.Equal(t, models.StatusOutdated, f.Status)
+	assert.Equal(t, "1.3.0", f.LatestVersion)
+	assert.Equal(t, "1.2.0", f.CurrentVersion)
 	client.AssertNotCalled(t, "FetchIndex")
 }
 

@@ -99,6 +99,18 @@ func (c *repoClient) FetchOCITags(ociURL string) (*Index, error) {
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
+	// Handle 401 by attempting anonymous token auth via Www-Authenticate challenge.
+	if resp.StatusCode == http.StatusUnauthorized {
+		tokenURL := parseWwwAuthenticate(resp.Header.Get("Www-Authenticate"), repo)
+		if tokenURL != "" {
+			resp, err = c.fetchWithToken(tagsURL, tokenURL)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch OCI tags from %s: %w", ociURL, err)
+			}
+			defer resp.Body.Close() //nolint:errcheck
+		}
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("OCI registry %s returned status %d", ociURL, resp.StatusCode)
 	}
@@ -125,6 +137,91 @@ func (c *repoClient) FetchOCITags(ociURL string) (*Index, error) {
 	}
 
 	return idx, nil
+}
+
+// fetchWithToken obtains a bearer token from tokenURL and retries the request.
+func (c *repoClient) fetchWithToken(targetURL, tokenURL string) (*http.Response, error) {
+	tokenResp, err := c.http.Get(tokenURL)
+	if err != nil {
+		return nil, fmt.Errorf("token request failed: %w", err)
+	}
+	defer tokenResp.Body.Close() //nolint:errcheck
+
+	if tokenResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("token endpoint returned status %d", tokenResp.StatusCode)
+	}
+
+	body, err := io.ReadAll(tokenResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token response: %w", err)
+	}
+
+	var tokenData struct {
+		Token       string `json:"token"`
+		AccessToken string `json:"access_token"`
+	}
+
+	if err := json.Unmarshal(body, &tokenData); err != nil {
+		return nil, fmt.Errorf("failed to parse token response: %w", err)
+	}
+
+	token := tokenData.Token
+	if token == "" {
+		token = tokenData.AccessToken
+	}
+
+	if token == "" {
+		return nil, fmt.Errorf("no token in auth response")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	// Use the underlying http.Client directly for requests with custom headers.
+	if hc, ok := c.http.(*http.Client); ok {
+		return hc.Do(req)
+	}
+
+	// Fallback: retry with plain GET (token won't be sent, but avoids panic).
+	return c.http.Get(targetURL)
+}
+
+// parseWwwAuthenticate extracts a token URL from a Www-Authenticate header.
+// Format: Bearer realm="https://auth.example.com/token",service="registry",scope="repository:path:pull"
+func parseWwwAuthenticate(header, repo string) string {
+	if header == "" {
+		return ""
+	}
+
+	header = strings.TrimPrefix(header, "Bearer ")
+
+	params := make(map[string]string)
+
+	for _, part := range strings.Split(header, ",") {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) == 2 {
+			params[kv[0]] = strings.Trim(kv[1], "\"")
+		}
+	}
+
+	realm := params["realm"]
+	if realm == "" {
+		return ""
+	}
+
+	service := params["service"]
+	scope := params["scope"]
+
+	// If no scope provided, construct one for pull access.
+	if scope == "" {
+		scope = fmt.Sprintf("repository:%s:pull", repo)
+	}
+
+	return fmt.Sprintf("%s?service=%s&scope=%s", realm, url.QueryEscape(service), url.QueryEscape(scope))
 }
 
 // isValidSemver returns true if the tag is a valid semantic version (X.Y.Z with optional v prefix and pre-release suffix).

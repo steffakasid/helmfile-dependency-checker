@@ -88,6 +88,11 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 		}
 	}
 
+	// OCI URL directly in the chart field (e.g. oci://registry/org/chart).
+	if isOCIRepo(rel.Chart) {
+		return c.checkOCIRelease(rel, rel.Chart, "")
+	}
+
 	repoName, chartName, ok := splitChart(rel.Chart)
 	if !ok {
 		return models.Finding{
@@ -119,7 +124,16 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 
 // checkOCIRelease handles version checking for OCI-based repositories.
 func (c *checker) checkOCIRelease(rel models.Release, repoURL, chartName string) models.Finding {
-	ociURL := strings.TrimRight(repoURL, "/") + "/" + chartName
+	var ociURL string
+
+	if chartName == "" {
+		// Full OCI URL in chart field — use it directly and extract chart name.
+		ociURL = strings.TrimRight(repoURL, "/")
+		parts := strings.Split(ociURL, "/")
+		chartName = parts[len(parts)-1]
+	} else {
+		ociURL = strings.TrimRight(repoURL, "/") + "/" + chartName
+	}
 
 	idx, err := c.client.FetchOCITags(ociURL)
 	if err != nil {
@@ -136,7 +150,7 @@ func (c *checker) checkOCIRelease(rel models.Release, repoURL, chartName string)
 		return models.Finding{
 			Release: rel,
 			Status:  models.StatusUnreachable,
-			Message: fmt.Sprintf("chart %q not found in OCI registry %q", chartName, repoURL),
+			Message: fmt.Sprintf("chart %q not found in OCI registry %q", chartName, ociURL),
 		}
 	}
 

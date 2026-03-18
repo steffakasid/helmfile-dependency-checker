@@ -253,3 +253,129 @@ func TestFetchOCITags_NoValidSemverTags(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no valid semver tags found")
 }
+
+func TestParseWwwAuthenticate_ValidHeader(t *testing.T) {
+	tests := []struct {
+		name    string
+		header  string
+		repo    string
+		wantURL string
+	}{
+		{
+			name:    "full header with realm, service, scope",
+			header:  `Bearer realm="https://auth.example.com/token",service="registry",scope="repository:charts/app:pull"`,
+			repo:    "charts/app",
+			wantURL: "https://auth.example.com/token?service=registry&scope=repository%3Acharts%2Fapp%3Apull",
+		},
+		{
+			name:    "realm and service only, scope derived from repo",
+			header:  `Bearer realm="https://auth.example.com/token",service="registry"`,
+			repo:    "charts/app",
+			wantURL: "https://auth.example.com/token?service=registry&scope=repository%3Acharts%2Fapp%3Apull",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := repository.ParseWwwAuthenticate(tc.header, tc.repo)
+			assert.Equal(t, tc.wantURL, result)
+		})
+	}
+}
+
+func TestParseWwwAuthenticate_EmptyOrInvalid(t *testing.T) {
+	assert.Equal(t, "", repository.ParseWwwAuthenticate("", "charts/app"))
+	assert.Equal(t, "", repository.ParseWwwAuthenticate("Basic realm=\"test\"", "charts/app"))
+}
+
+func TestFetchOCITags_AuthRetrySuccess(t *testing.T) {
+	tagsJSON := `{"name":"charts/app","tags":["1.0.0","2.0.0"]}`
+	tokenJSON := `{"token":"test-bearer-token"}`
+
+	httpClient := mocks.NewMockHTTPClient(t)
+
+	// First call returns 401 with Www-Authenticate header.
+	httpClient.EXPECT().
+		Get("https://registry.example.com/v2/charts/app/tags/list").
+		Return(&http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header: http.Header{
+				"Www-Authenticate": []string{`Bearer realm="https://auth.example.com/token",service="registry",scope="repository:charts/app:pull"`},
+			},
+			Body: io.NopCloser(bytes.NewBufferString("")),
+		}, nil).Once()
+
+	// Token request.
+	httpClient.EXPECT().
+		Get("https://auth.example.com/token?service=registry&scope=repository%3Acharts%2Fapp%3Apull").
+		Return(&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString(tokenJSON)),
+		}, nil).Once()
+
+	// The retry with bearer token goes through http.Client.Do, not Get.
+	// Since our mock only implements Get (HTTPClient interface), the fallback
+	// path in fetchWithToken will call Get again. We mock that too.
+	httpClient.EXPECT().
+		Get("https://registry.example.com/v2/charts/app/tags/list").
+		Return(&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBufferString(tagsJSON)),
+		}, nil).Once()
+
+	client := repository.New(httpClient)
+	idx, err := client.FetchOCITags("oci://registry.example.com/charts/app")
+	require.NoError(t, err)
+
+	assert.Contains(t, idx.Entries, "app")
+	assert.Len(t, idx.Entries["app"], 2)
+}
+
+func TestFetchOCITags_AuthTokenRequestFails(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(t)
+
+	httpClient.EXPECT().
+		Get("https://registry.example.com/v2/charts/app/tags/list").
+		Return(&http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header: http.Header{
+				"Www-Authenticate": []string{`Bearer realm="https://auth.example.com/token",service="registry"`},
+			},
+			Body: io.NopCloser(bytes.NewBufferString("")),
+		}, nil).Once()
+
+	httpClient.EXPECT().
+		Get("https://auth.example.com/token?service=registry&scope=repository%3Acharts%2Fapp%3Apull").
+		Return(nil, errors.New("auth server unreachable")).Once()
+
+	client := repository.New(httpClient)
+	_, err := client.FetchOCITags("oci://registry.example.com/charts/app")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token request failed")
+}
+
+func TestFetchOCITags_AuthTokenNon200(t *testing.T) {
+	httpClient := mocks.NewMockHTTPClient(t)
+
+	httpClient.EXPECT().
+		Get("https://registry.example.com/v2/charts/app/tags/list").
+		Return(&http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Header: http.Header{
+				"Www-Authenticate": []string{`Bearer realm="https://auth.example.com/token",service="registry"`},
+			},
+			Body: io.NopCloser(bytes.NewBufferString("")),
+		}, nil).Once()
+
+	httpClient.EXPECT().
+		Get("https://auth.example.com/token?service=registry&scope=repository%3Acharts%2Fapp%3Apull").
+		Return(&http.Response{
+			StatusCode: http.StatusForbidden,
+			Body:       io.NopCloser(bytes.NewBufferString("")),
+		}, nil).Once()
+
+	client := repository.New(httpClient)
+	_, err := client.FetchOCITags("oci://registry.example.com/charts/app")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token endpoint returned status 403")
+}

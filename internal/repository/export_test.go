@@ -8,3 +8,6 @@ var IsValidSemver = isValidSemver
 
 // ParseOCIURL exports parseOCIURL for external testing.
 var ParseOCIURL = parseOCIURL
+
+// ParseWwwAuthenticate exports parseWwwAuthenticate for external testing.
+var ParseWwwAuthenticate = parseWwwAuthenticate
