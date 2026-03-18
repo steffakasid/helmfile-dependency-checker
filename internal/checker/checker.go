@@ -17,6 +17,7 @@ var ErrChartNotFound = fmt.Errorf("chart not found in repository index")
 // RepositoryClient fetches a Helm repository index.
 type RepositoryClient interface {
 	FetchIndex(repoURL string) (*repository.Index, error)
+	FetchOCITags(ociURL string) (*repository.Index, error)
 }
 
 // Checker runs dependency checks against a parsed Helmfile.
@@ -79,6 +80,14 @@ func (c *checker) Check(hf *models.Helmfile) (*models.Result, error) {
 }
 
 func (c *checker) checkRelease(rel models.Release, repoByName map[string]string) models.Finding {
+	if isLocalChart(rel.Chart) {
+		return models.Finding{
+			Release: rel,
+			Status:  models.StatusSkipped,
+			Message: fmt.Sprintf("local chart reference %q skipped", rel.Chart),
+		}
+	}
+
 	repoName, chartName, ok := splitChart(rel.Chart)
 	if !ok {
 		return models.Finding{
@@ -101,6 +110,65 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 		return models.Finding{Release: rel, Status: models.StatusOK, Message: "excluded"}
 	}
 
+	if isOCIRepo(repoURL) {
+		return c.checkOCIRelease(rel, repoURL, chartName)
+	}
+
+	return c.checkHTTPRelease(rel, repoName, repoURL, chartName)
+}
+
+// checkOCIRelease handles version checking for OCI-based repositories.
+func (c *checker) checkOCIRelease(rel models.Release, repoURL, chartName string) models.Finding {
+	ociURL := strings.TrimRight(repoURL, "/") + "/" + chartName
+
+	idx, err := c.client.FetchOCITags(ociURL)
+	if err != nil {
+		slog.Warn("failed to fetch OCI tags", "url", ociURL, "error", err)
+		return models.Finding{
+			Release: rel,
+			Status:  models.StatusUnreachable,
+			Message: fmt.Sprintf("failed to fetch OCI tags from %q: %s", ociURL, err),
+		}
+	}
+
+	versions, ok := idx.Entries[chartName]
+	if !ok || len(versions) == 0 {
+		return models.Finding{
+			Release: rel,
+			Status:  models.StatusUnreachable,
+			Message: fmt.Sprintf("chart %q not found in OCI registry %q", chartName, repoURL),
+		}
+	}
+
+	// Find latest version by semver comparison since OCI tags have no timestamps.
+	latest := versions[0]
+	for _, v := range versions[1:] {
+		if isNewer(v.Version, latest.Version) {
+			latest = v
+		}
+	}
+
+	status := models.StatusOK
+	message := "up-to-date"
+
+	if rel.Version != "" && rel.Version != latest.Version {
+		if isNewer(latest.Version, rel.Version) {
+			status = models.StatusOutdated
+			message = fmt.Sprintf("newer version %s available", latest.Version)
+		}
+	}
+
+	return models.Finding{
+		Release:        rel,
+		Status:         status,
+		CurrentVersion: rel.Version,
+		LatestVersion:  latest.Version,
+		Message:        message,
+	}
+}
+
+// checkHTTPRelease handles version checking for HTTP/HTTPS-based repositories.
+func (c *checker) checkHTTPRelease(rel models.Release, repoName, repoURL, chartName string) models.Finding {
 	idx, err := c.client.FetchIndex(repoURL)
 	if err != nil {
 		slog.Warn("failed to fetch repository index", "repo", repoName, "error", err)
@@ -177,6 +245,18 @@ func (c *checker) isRepoExcluded(repoURL string) bool {
 	}
 
 	return false
+}
+
+// isOCIRepo returns true if the repository URL uses the oci:// scheme.
+func isOCIRepo(repoURL string) bool {
+	return strings.HasPrefix(repoURL, "oci://")
+}
+
+// isLocalChart returns true if the chart field is a local filesystem path.
+func isLocalChart(chart string) bool {
+	return strings.HasPrefix(chart, "./") ||
+		strings.HasPrefix(chart, "../") ||
+		strings.HasPrefix(chart, "/")
 }
 
 // isNewer returns true if candidate is a higher semver than current.

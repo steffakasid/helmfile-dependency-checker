@@ -52,6 +52,7 @@ var statusIcon = map[models.Status]string{
 	models.StatusOutdated:     "⚠️",
 	models.StatusUnmaintained: "🔴",
 	models.StatusUnreachable:  "❌",
+	models.StatusSkipped:      "⏭️",
 }
 
 func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
@@ -91,8 +92,13 @@ type htmlWriter struct{}
 func (h *htmlWriter) Write(w io.Writer, result *models.Result) error {
 	rows := &strings.Builder{}
 	for _, f := range result.Findings {
+		style := ""
+		if f.Status == models.StatusSkipped {
+			style = ` style="color:#888;background:#f5f5f5"`
+		}
 		fmt.Fprintf(rows,
-			"<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
+			"<tr%s><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
+			style,
 			f.Release.Name, f.Release.Chart,
 			f.CurrentVersion, f.LatestVersion,
 			f.Status, f.Message,

@@ -42,4 +42,5 @@ require (
 	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
+	pgregory.net/rapid v1.2.0 // indirect
 )

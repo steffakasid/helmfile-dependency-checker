@@ -68,3 +68,55 @@ func TestWrite_HTML(t *testing.T) {
 	assert.Contains(t, out, "redis")
 	assert.Contains(t, out, "17.0.0")
 }
+
+var skippedResult = &models.Result{
+	Findings: []models.Finding{
+		{
+			Release:        models.Release{Name: "local-chart", Chart: "./charts/mychart"},
+			Status:         models.StatusSkipped,
+			CurrentVersion: "1.0.0",
+			LatestVersion:  "",
+			Message:        "local chart reference",
+		},
+	},
+}
+
+func TestWrite_JSON_StatusSkipped(t *testing.T) {
+	w, err := report.New("json")
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, skippedResult))
+
+	out := buf.String()
+	assert.Contains(t, out, `"Status"`)
+	assert.Contains(t, out, "skipped")
+	assert.Contains(t, out, "local-chart")
+	assert.Contains(t, out, "./charts/mychart")
+}
+
+func TestWrite_Markdown_StatusSkipped(t *testing.T) {
+	w, err := report.New("markdown")
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, skippedResult))
+
+	out := buf.String()
+	assert.Contains(t, out, "⏭️ local-chart (./charts/mychart)")
+	assert.Contains(t, out, "local chart reference")
+}
+
+func TestWrite_HTML_StatusSkipped(t *testing.T) {
+	w, err := report.New("html")
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, skippedResult))
+
+	out := buf.String()
+	assert.Contains(t, out, "local-chart")
+	assert.Contains(t, out, "./charts/mychart")
+	assert.Contains(t, out, "skipped")
+	assert.Contains(t, out, `style="color:#888;background:#f5f5f5"`)
+}

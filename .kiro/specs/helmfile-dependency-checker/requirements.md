@@ -105,6 +105,29 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 - AC-009.8: WHEN sub-helmfiles contain their own `helmfiles:` keys, THE Parser SHALL recursively follow and parse nested sub-helmfile references
 - AC-009.9: THE Helmfile model SHALL include a `Helmfiles` field to capture raw `helmfiles:` entries from the YAML structure
 
+### US-010: Exclude Local Chart References from Dependency Checking
+**As a** DevOps engineer  
+**I want to** have hdc skip local chart references (e.g. `./charts/mychart`) during dependency checking  
+**So that** locally maintained charts are not flagged as outdated or unresolvable
+
+**Acceptance Criteria:**
+- AC-010.1: WHEN a release references a chart using a relative path (e.g. `./charts/mychart`), THE Checker SHALL exclude that release from dependency checking
+- AC-010.2: WHEN a release references a chart using an absolute local path, THE Checker SHALL exclude that release from dependency checking
+- AC-010.3: WHEN a local chart reference is excluded, THE Report SHALL omit the release from findings or mark it as skipped with a clear reason
+- AC-010.4: THE Parser SHALL identify local chart references by detecting path prefixes such as `./`, `../`, or `/` in the chart field of a release
+
+### US-011: Support OCI Repository References
+**As a** DevOps engineer  
+**I want to** have hdc handle OCI-based Helm chart repository references (e.g. `oci://registry.example.com/charts/mychart`)  
+**So that** charts hosted in OCI registries are included in dependency checking
+
+**Acceptance Criteria:**
+- AC-011.1: WHEN a release references a repository with an `oci://` scheme, THE Repository_Client SHALL fetch chart version metadata from the OCI registry
+- AC-011.2: WHEN an OCI registry is queried, THE Repository_Client SHALL retrieve the list of available tags for the chart and determine the latest version using semantic versioning
+- AC-011.3: IF an OCI registry is unreachable or returns an error, THEN THE Checker SHALL report the failure with a descriptive error including the OCI reference URL
+- AC-011.4: THE Parser SHALL recognize `oci://` prefixed repository URLs and pass them to the OCI-aware Repository_Client
+- AC-011.5: WHEN OCI chart versions are retrieved, THE Checker SHALL compare the current version against the latest available version using the same semantic versioning logic as HTTP/HTTPS repositories
+
 ## Non-Functional Requirements
 
 ### NFR-001: Performance

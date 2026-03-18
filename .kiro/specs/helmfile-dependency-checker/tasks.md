@@ -74,3 +74,31 @@
 - [x] 10.11 Add test: mixed string and map entries in same `helmfiles:` list
 - [x] 10.12 Add integration test using existing `testdata/helmfiles/helmfile.yaml` (which already contains `helmfiles:` entries)
 - [x] 10.13 Ensure linting and all tests pass (`make lint && make test`)
+
+## 11. Exclude Local Chart References (US-010)
+- [x] 11.1 Add `StatusSkipped Status = "skipped"` constant to `internal/models/result.go`
+- [x] 11.2 Implement `isLocalChart(chart string) bool` helper in `internal/checker/checker.go` detecting `./`, `../`, `/` prefixes
+- [x] 11.3 Add local chart check to `checkRelease` flow — return `StatusSkipped` finding before `splitChart` is called
+- [x] 11.4 Update report writers (JSON, Markdown, HTML) in `internal/report/report.go` to handle `StatusSkipped` findings
+- [x] 11.5 Add unit test: `isLocalChart` returns true for `./charts/mychart`, `../shared/chart`, `/absolute/path/chart`
+- [x] 11.6 Add unit test: `isLocalChart` returns false for `bitnami/redis`, `oci://registry/chart`, `mychart`
+- [x] 11.7 Add unit test: checker skips local chart release and returns `StatusSkipped` without calling repository client
+- [x] 11.8 Add unit test: report output includes or correctly handles `StatusSkipped` findings
+- [x] 11.9 Add property test: *for any* string with path prefix (`./`, `../`, `/`), `isLocalChart` returns true; for any string without, returns false (Property 10)
+- [x] 11.10 Ensure linting and all tests pass (`make lint && make test`)
+
+## 12. OCI Repository Support (US-011)
+- [x] 12.1 Add `FetchOCITags(ociURL string) (*Index, error)` method to `Client` interface in `internal/repository/client.go`
+- [x] 12.2 Implement `parseOCIURL(ociURL string) (host, repo, chartName string, err error)` helper in `internal/repository/client.go`
+- [x] 12.3 Implement `FetchOCITags` on `repoClient`: construct `https://{host}/v2/{repo}/tags/list` URL, HTTP GET, parse JSON response, filter to valid semver tags, build `Index`
+- [x] 12.4 Implement `isOCIRepo(repoURL string) bool` helper in `internal/checker/checker.go`
+- [x] 12.5 Add OCI branch to `checkRelease` flow: detect OCI repo URL → call `FetchOCITags` → extract chart name from OCI URL → compare versions using existing `isNewer`/`parseSemver`
+- [x] 12.6 Regenerate mocks for updated `Client` interface (`make generate` or mockery)
+- [x] 12.7 Add unit test: `parseOCIURL` correctly extracts host, repo, and chart name from valid `oci://` URLs
+- [x] 12.8 Add unit test: `FetchOCITags` constructs correct API URL and parses tags response
+- [x] 12.9 Add unit test: `FetchOCITags` filters non-semver tags (e.g. `latest`, `dev`) and returns only valid versions
+- [x] 12.10 Add unit test: `isOCIRepo` returns true for `oci://` URLs and false for `http://`/`https://` URLs
+- [x] 12.11 Add unit test: checker handles OCI release end-to-end — outdated, up-to-date, and unreachable cases
+- [x] 12.12 Add property test: *for any* list of mixed semver/non-semver tags, OCI client returns only valid semver entries with correct latest (Property 12)
+- [x] 12.13 Add property test: *for any* URL with `oci://` prefix, `isOCIRepo` returns true; for any other scheme, returns false (Property 13)
+- [x] 12.14 Ensure linting and all tests pass (`make lint && make test`)

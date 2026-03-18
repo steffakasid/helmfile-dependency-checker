@@ -78,6 +78,64 @@ func (_c *MockClient_FetchIndex_Call) RunAndReturn(run func(string) (*repository
 	return _c
 }
 
+// FetchOCITags provides a mock function with given fields: ociURL
+func (_m *MockClient) FetchOCITags(ociURL string) (*repository.Index, error) {
+	ret := _m.Called(ociURL)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FetchOCITags")
+	}
+
+	var r0 *repository.Index
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (*repository.Index, error)); ok {
+		return rf(ociURL)
+	}
+	if rf, ok := ret.Get(0).(func(string) *repository.Index); ok {
+		r0 = rf(ociURL)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*repository.Index)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(ociURL)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockClient_FetchOCITags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FetchOCITags'
+type MockClient_FetchOCITags_Call struct {
+	*mock.Call
+}
+
+// FetchOCITags is a helper method to define mock.On call
+//   - ociURL string
+func (_e *MockClient_Expecter) FetchOCITags(ociURL interface{}) *MockClient_FetchOCITags_Call {
+	return &MockClient_FetchOCITags_Call{Call: _e.mock.On("FetchOCITags", ociURL)}
+}
+
+func (_c *MockClient_FetchOCITags_Call) Run(run func(ociURL string)) *MockClient_FetchOCITags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockClient_FetchOCITags_Call) Return(_a0 *repository.Index, _a1 error) *MockClient_FetchOCITags_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockClient_FetchOCITags_Call) RunAndReturn(run func(string) (*repository.Index, error)) *MockClient_FetchOCITags_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockClient creates a new instance of MockClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockClient(t interface {

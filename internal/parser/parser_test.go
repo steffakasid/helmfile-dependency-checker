@@ -388,7 +388,7 @@ func (f fakeDirEntry) Info() (os.FileInfo, error) { return nil, nil }
 
 func TestParse_Integration_SubHelmfiles(t *testing.T) {
 	p := parser.New()
-	hf, err := p.Parse("../../testdata/helmfiles/helmfile-integration.yaml")
+	hf, err := p.Parse("../../testdata/helmfile-integration.yaml")
 	require.NoError(t, err)
 
 	// Parent defines 4 repositories; sub-helmfiles define none.
@@ -481,7 +481,7 @@ releases:
 
 func TestParse_Integration_MultiDocumentYAML(t *testing.T) {
 	p := parser.New()
-	hf, err := p.Parse("../../testdata/helmfiles/helmfile-multidoc.yaml")
+	hf, err := p.Parse("../../testdata/helmfile-multidoc.yaml")
 	require.NoError(t, err)
 
 	// The multi-doc file references databases and ingress sub-helmfiles
@@ -502,7 +502,7 @@ func TestParse_Integration_OverlappingEntriesDetectedAsCircular(t *testing.T) {
 	// reference the same files. The visited-path cycle detection treats
 	// re-visiting an already-parsed file as a circular reference.
 	p := parser.New()
-	_, err := p.Parse("../../testdata/helmfiles/helmfile.yaml")
+	_, err := p.Parse("../../testdata/helmfile-err-circular.yaml")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "circular sub-helmfile reference detected")
 }

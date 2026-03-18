@@ -1,296 +1,348 @@
-# Helmfile Dependency Checker - Technical Design
+# Helmfile Dependency Checker — Design Document
 
 ## Overview
-HDC is a standalone Go CLI tool that parses helmfile.yaml files, queries Helm chart repositories, and produces dependency health reports. It requires no Helm or helmfile binaries.
+
+The Helmfile Dependency Checker (hdc) is a standalone CLI tool that verifies Helm chart dependencies declared in helmfile configurations are up-to-date and actively maintained. It parses helmfile.yaml files (including directory structures, Go templates, and sub-helmfile references), queries Helm chart repositories for the latest versions, and generates reports in multiple formats (JSON, Markdown, HTML).
+
+This design covers the full feature set (US-001 through US-011), with particular focus on two new capabilities:
+
+- **US-010 — Local Chart Exclusion**: Automatically skip releases that reference local filesystem charts (`./`, `../`, `/` prefixes) since these cannot be checked against a remote repository.
+- **US-011 — OCI Repository Support**: Fetch chart version metadata from OCI-based registries (`oci://` scheme) using the OCI Distribution API, extending the existing HTTP-based repository client.
 
 ## Architecture
 
-### High-Level Design
+The system follows a pipeline architecture with clear separation of concerns:
 
-```
-┌─────────┐     ┌────────┐     ┌────────────┐     ┌──────────┐     ┌────────┐
-│   CLI   │────▶│ Config │────▶│   Parser   │────▶│ Checker  │────▶│ Report │
-│  (Cobra)│     │ (Viper)│     │            │     │          │     │        │
-└─────────┘     └────────┘     └────────────┘     └──────────┘     └────────┘
-                                                       │
-                                                       ▼
-                                                  ┌──────────┐
-                                                  │Repository│
-                                                  │  Client  │
-                                                  └──────────┘
-```
+```mermaid
+graph LR
+    CLI[CLI / Cobra] --> Config[Config / Viper]
+    Config --> Parser
+    Parser --> Checker
+    Checker --> RepoClient[Repository Client]
+    Checker --> Report[Report Writer]
 
-### Module Structure
+    subgraph "internal/parser"
+        Parser[Parser]
+    end
 
-```
-cmd/
-└── main.go              # CLI entry point (Cobra root + subcommands)
+    subgraph "internal/checker"
+        Checker[Checker]
+    end
 
-internal/
-├── config/              # Configuration management (Viper)
-│   ├── config.go
-│   └── config_test.go
-├── models/              # Shared data structures
-│   ├── helmfile.go      # Helmfile, Release, Repository types
-│   └── result.go        # Result, Finding, Status types
-├── parser/              # Helmfile parsing
-│   ├── parser.go
-│   └── parser_test.go
-├── repository/          # Helm repository HTTP client
-│   ├── client.go        # Client interface + HTTP implementation
-│   ├── index.go         # YAML index parsing
-│   └── client_test.go
-├── checker/             # Version comparison + maintenance checks
-│   ├── checker.go
-│   └── checker_test.go
-└── report/              # Multi-format output (JSON, Markdown, HTML)
-    ├── report.go
-    └── report_test.go
+    subgraph "internal/repository"
+        RepoClient
+        HTTPFetcher[HTTP Fetcher]
+        OCIFetcher[OCI Fetcher]
+    end
+
+    RepoClient --> HTTPFetcher
+    RepoClient --> OCIFetcher
 ```
 
-### Module Responsibilities
+### Data Flow
 
-| Module | Responsibility | Key Interfaces |
-|--------|---------------|----------------|
-| `config` | Load config from file/env/defaults, init logger | `Config` struct |
-| `models` | Shared types across all modules | `Helmfile`, `Release`, `Repository`, `Result`, `Finding`, `Status` |
-| `parser` | Parse helmfile.yaml / helmfile.d/ into `Helmfile` | `Parser`, `FileReader` |
-| `repository` | Fetch + parse Helm repo index.yaml over HTTP | `Client`, `HTTPClient` |
-| `checker` | Compare versions, check maintenance age, apply exclusions | `Checker`, `RepositoryClient` |
-| `report` | Format `Result` as JSON/Markdown/HTML | `Writer` |
-| `cmd` | Wire everything together, handle CLI flags + exit codes | Cobra commands |
+1. **CLI** parses flags, loads config via Viper
+2. **Parser** reads helmfile(s), strips Go templates, resolves sub-helmfiles, merges repos/releases
+3. **Checker** iterates releases concurrently:
+   - Skips excluded charts and local chart references (US-010)
+   - Resolves repository URL from the repo name
+   - Dispatches to HTTP or OCI client based on URL scheme (US-011)
+   - Compares versions, checks maintenance age
+4. **Report Writer** formats findings to JSON/Markdown/HTML
+
+### Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Local charts detected in Checker, not Parser | Parser's job is structural parsing; the Checker decides what to check. `splitChart` would fail on paths anyway, so early detection avoids confusing error messages. |
+| New `StatusSkipped` status | Distinguishes intentionally-skipped releases from OK/excluded ones in reports, giving users clear visibility. |
+| OCI support via separate `FetchOCITags` method on Client | Keeps the existing `FetchIndex` path untouched. OCI registries have a fundamentally different API (tags/list vs index.yaml). |
+| Semver filtering of OCI tags | OCI tag lists contain arbitrary strings; only valid semver tags should be considered for version comparison. |
+
+## Components and Interfaces
+
+### Models (`internal/models`)
+
+**Existing** (unchanged):
+- `Helmfile` — top-level struct with `Repositories`, `Releases`, `Helmfiles`
+- `Release` — `Name`, `Namespace`, `Chart`, `Version`
+- `Repository` — `Name`, `URL`
+- `SubHelmfileEntry` — `Path`, `Selectors`, `SelectorsInherited`
+- `Finding` — check result per release
+- `Result` — aggregated findings
+
+**New**:
+- `StatusSkipped Status = "skipped"` — added to `result.go` for local chart references
+
+### Parser (`internal/parser`)
+
+No changes required for US-010 or US-011. The parser already extracts `Repository.URL` and `Release.Chart` as raw strings. Detection of local paths and OCI schemes happens downstream in the checker and repository client.
+
+### Checker (`internal/checker`)
+
+**New helper**:
+```go
+// isLocalChart returns true if the chart field is a local filesystem path.
+func isLocalChart(chart string) bool {
+    return strings.HasPrefix(chart, "./") ||
+           strings.HasPrefix(chart, "../") ||
+           strings.HasPrefix(chart, "/")
+}
+```
+
+**Modified `checkRelease` flow**:
+1. Check `isLocalChart(rel.Chart)` → return `StatusSkipped` finding
+2. Check `isOCIRelease(rel, repoByName)` → use OCI path
+3. Existing HTTP path (splitChart → FetchIndex → compare)
+
+**OCI release detection**:
+```go
+// isOCIRepo returns true if the repository URL uses the oci:// scheme.
+func isOCIRepo(repoURL string) bool {
+    return strings.HasPrefix(repoURL, "oci://")
+}
+```
+
+For OCI releases, the chart name is extracted from the OCI URL rather than using `splitChart`. The OCI URL format is `oci://registry.example.com/path/to/chart`, and the chart name is the last path segment.
+
+### Repository Client (`internal/repository`)
+
+**Extended `Client` interface**:
+```go
+type Client interface {
+    FetchIndex(repoURL string) (*Index, error)
+    FetchOCITags(ociURL string) (*Index, error)
+}
+```
+
+**`FetchOCITags` implementation**:
+1. Parse the `oci://` URL to extract registry host and repository path
+2. Construct the OCI Distribution API URL: `https://{host}/v2/{repo}/tags/list`
+3. HTTP GET the tags list endpoint
+4. Parse the JSON response: `{"name":"...","tags":["1.0.0","1.1.0",...]}`
+5. Filter tags to valid semver only
+6. Build an `Index` with a single entry keyed by the chart name (last path segment)
+7. Each tag becomes a `ChartVersion` with `Created` set to zero time (OCI tags/list doesn't provide timestamps)
+
+**OCI URL parsing helper**:
+```go
+// parseOCIURL extracts host, repo path, and chart name from an oci:// URL.
+// Example: oci://registry.example.com/charts/mychart
+//   → host: registry.example.com, repo: charts/mychart, chart: mychart
+func parseOCIURL(ociURL string) (host, repo, chartName string, err error)
+```
+
+### Report (`internal/report`)
+
+Existing report writers already iterate `Result.Findings` and render based on `Status`. The new `StatusSkipped` value needs to be handled in each writer:
+- **JSON**: included as `"status": "skipped"`
+- **Markdown**: row with "skipped" badge
+- **HTML**: row with neutral/grey styling
+
+Alternatively, skipped releases can be omitted from findings entirely (configurable). The default behavior is to include them with `StatusSkipped` for transparency.
 
 ## Data Models
 
-### Core Types (models package)
+### Release Check Flow State Machine
 
-```go
-type Repository struct {
-    Name string `yaml:"name"`
-    URL  string `yaml:"url"`
-}
+```mermaid
+stateDiagram-v2
+    [*] --> Excluded: isExcluded()
+    [*] --> Skipped: isLocalChart()
+    [*] --> CheckRepo: remote chart
 
-type Release struct {
-    Name      string `yaml:"name"`
-    Namespace string `yaml:"namespace"`
-    Chart     string `yaml:"chart"`  // format: "repo/chart"
-    Version   string `yaml:"version"`
-}
+    CheckRepo --> Unreachable: splitChart fails
+    CheckRepo --> Unreachable: repo not declared
+    CheckRepo --> Unreachable: fetch fails
+    CheckRepo --> CompareVersion: index fetched
 
-type Helmfile struct {
-    Repositories []Repository `yaml:"repositories"`
-    Releases     []Release    `yaml:"releases"`
-    Helmfiles    []any        `yaml:"helmfiles"`
-}
+    CompareVersion --> OK: version matches
+    CompareVersion --> Outdated: newer available
+    CompareVersion --> Unmaintained: age > threshold
 
-type SubHelmfileEntry struct {
-    Path               string   `yaml:"path"`
-    Selectors          []string `yaml:"selectors"`
-    SelectorsInherited bool     `yaml:"selectorsInherited"`
-}
+    Excluded --> [*]
+    Skipped --> [*]
+    Unreachable --> [*]
+    OK --> [*]
+    Outdated --> [*]
+    Unmaintained --> [*]
+```
 
-type Status string // "ok", "outdated", "unmaintained", "unreachable"
+### OCI Tags Response
 
-type Finding struct {
-    Release        Release
-    Status         Status
-    CurrentVersion string
-    LatestVersion  string
-    LastUpdated    string
-    Message        string
-}
-
-type Result struct {
-    Findings []Finding
+```json
+{
+  "name": "charts/mychart",
+  "tags": ["1.0.0", "1.1.0", "2.0.0-rc1", "latest"]
 }
 ```
 
-### Configuration (config package)
+Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-release suffix) are considered. Non-semver tags like `latest` are ignored.
 
-```go
-type Config struct {
-    Log          struct{ Level, Format string }
-    Output       struct{ Format, File string }
-    Checker      struct{ MaxAgeMonths int; FailOnOutdated bool; ConcurrentRequests int }
-    Repositories struct{ TimeoutSeconds int; SkipTLSVerify bool }
-    Exclude      struct{ Charts, Repositories []string }
-}
-```
+### Status Values
 
-Config sources (precedence): CLI flags > env vars (`HELMFILE_CHECKER_*`) > config file (`.helmfile-checker.yaml`) > defaults.
+| Status | Meaning |
+|--------|---------|
+| `ok` | Chart is up-to-date and maintained |
+| `outdated` | Newer version available |
+| `unmaintained` | Latest release exceeds age threshold |
+| `unreachable` | Repository or chart not accessible |
+| `skipped` | Local chart reference, not checked (NEW) |
 
-## Interfaces
 
-All module boundaries use interfaces for testability. Mocks are generated via mockery.
+## Correctness Properties
 
-```go
-// parser
-type Parser interface { Parse(path string) (*models.Helmfile, error) }
-type FileReader interface { ReadFile(path string) ([]byte, error); ReadDir(path string) ([]os.DirEntry, error); Glob(pattern string) ([]string, error) }
+*A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-// repository
-type Client interface { FetchIndex(repoURL string) (*Index, error) }
-type HTTPClient interface { Get(url string) (*http.Response, error) }
+### Property 1: Parser extracts all releases and repositories
 
-// checker
-type Checker interface { Check(hf *models.Helmfile) (*models.Result, error) }
-type RepositoryClient interface { FetchIndex(repoURL string) (*Index, error) }
+*For any* valid helmfile YAML containing N releases and M repositories, parsing it should produce a `Helmfile` with exactly N releases and M repositories, each preserving the original chart, version, name, and URL fields.
 
-// report
-type Writer interface { Write(w io.Writer, result *models.Result) error }
-```
+**Validates: Requirements AC-001.2**
 
-## Key Algorithms
+### Property 2: Semver comparison correctness
 
-### Version Comparison
-- Parse semver `vX.Y.Z` or `X.Y.Z` into `[major, minor, patch]`
-- Strip pre-release suffixes before comparison
-- Fall back to string inequality for non-semver versions
+*For any* two valid semantic version strings A and B where A > B (by semver ordering), `isNewer(A, B)` should return true, and `isNewer(B, A)` should return false. For equal versions, `isNewer(A, A)` should return false.
 
-### Maintenance Check
-- Compare `latest.Created` timestamp against `MaxAgeMonths` threshold
-- Charts exceeding threshold are flagged as `unmaintained`
+**Validates: Requirements AC-002.2, AC-011.5**
 
-### Concurrency
-- Concurrent repository fetches bounded by `ConcurrentRequests` semaphore
-- Results collected via mutex-protected slice
+### Property 3: Unreachable repository produces StatusUnreachable
 
-## CLI Design
+*For any* release whose repository (HTTP or OCI) returns an error during index/tag fetching, the resulting finding should have `StatusUnreachable` and a non-empty message containing the repository identifier.
 
-```
-hdc check <helmfile-path> [flags]
-  -o, --output         Output format: json, markdown, html (default: markdown)
-  --output-file        Write report to file instead of stdout
-  --max-age            Max chart age in months (default: 12)
-  --fail-on-outdated   Exit non-zero if issues found
-  --concurrent         Concurrent repo queries (default: 5)
-  --timeout            Request timeout in seconds (default: 30)
+**Validates: Requirements AC-003.3, AC-011.3**
 
-hdc version            Print version info
+### Property 4: Maintenance age threshold detection
 
-Global flags:
-  -c, --config         Config file path
-  --log-level          Log level: debug, info, warn, error
-  --log-format         Log format: text, json
-```
+*For any* chart whose latest version has a `Created` timestamp older than `maxAgeMonths` from now, the checker should produce a finding with `StatusUnmaintained`. For any chart whose latest version is within the threshold, the status should not be `StatusUnmaintained`.
 
-## Build & Release
-- GoReleaser for cross-platform builds and releases
-- Version injected via ldflags at build time
-- Mockery for interface mock generation
+**Validates: Requirements AC-004.2**
 
-### Homebrew Distribution
+### Property 5: Report contains all findings with status
 
-GoReleaser's `brews` section automates Homebrew formula generation and publishing on each release.
+*For any* set of findings, each report format (JSON, Markdown, HTML) should produce output that contains every finding's release name and status string.
 
-**Tap Repository:** `github.com/steffenrumpf/homebrew-tap`  
-This is a separate GitHub repository that hosts the generated formula. Users add it via `brew tap steffenrumpf/tap`.
+**Validates: Requirements AC-005.1, AC-005.2**
 
-**GoReleaser `brews` Configuration:**
+### Property 6: HasIssues reflects non-OK findings
 
-```yaml
-brews:
-  - repository:
-      owner: steffenrumpf
-      name: homebrew-tap
-    name: hdc
-    homepage: "https://github.com/steffenrumpf/hdc"
-    description: "Helmfile Dependency Checker - verify Helm chart dependencies are up-to-date"
-    license: "MIT"
-    install: |
-      bin.install "hdc"
-    test: |
-      system "#{bin}/hdc", "version"
-```
+*For any* Result, `HasIssues()` should return true if and only if at least one finding has a status other than `StatusOK`.
 
-**How it works:**
-1. On `goreleaser release`, GoReleaser builds archives for all OS/arch combos (already configured).
-2. The `brews` section generates a Ruby formula file (`hdc.rb`) containing download URLs and SHA256 checksums for each archive.
-3. GoReleaser pushes `hdc.rb` to the `homebrew-tap` repository via GitHub token.
-4. Users install with: `brew tap steffenrumpf/tap && brew install hdc` (or shorthand `brew install steffenrumpf/tap/hdc`).
+**Validates: Requirements AC-006.1**
 
-**Prerequisites:**
-- The `homebrew-tap` repository must exist on GitHub before the first release.
-- The `GITHUB_TOKEN` used by GoReleaser must have write access to the tap repository.
+### Property 7: Excluded charts are skipped
 
-**Supported platforms:** darwin/amd64, darwin/arm64, linux/amd64, linux/arm64 (matching existing `builds` config).
+*For any* release whose chart name or release name matches an entry in `ExcludeCharts`, the checker should return a finding with `StatusOK` and message "excluded", without making any repository requests.
 
-## Sub-Helmfile Resolution (US-009)
+**Validates: Requirements AC-007.3**
 
-### Overview
+### Property 8: Sub-helmfile merge preserves all releases and repositories
 
-The `helmfiles:` key in helmfile.yaml references other helmfile files that should be parsed and merged. HDC follows these references to collect all repositories and releases across a split helmfile configuration.
+*For any* parent helmfile referencing N sub-helmfiles (via glob or explicit path), the merged result should contain the union of all releases and repositories from the parent and all sub-helmfiles.
 
-### Model Changes
+**Validates: Requirements AC-009.3**
 
-The `Helmfile` struct in `internal/models/helmfile.go` gains a new field to capture raw `helmfiles:` entries:
+### Property 9: Missing sub-helmfile path produces descriptive error
 
-```go
-type SubHelmfileEntry struct {
-    Path               string   `yaml:"path"`
-    Selectors          []string `yaml:"selectors"`
-    SelectorsInherited bool     `yaml:"selectorsInherited"`
-}
+*For any* helmfile referencing a non-existent explicit path in `helmfiles:`, the parser should return an error whose message contains the missing file path.
 
-type Helmfile struct {
-    Repositories []Repository       `yaml:"repositories"`
-    Releases     []Release          `yaml:"releases"`
-    Helmfiles    []any              `yaml:"helmfiles"`
-}
-```
+**Validates: Requirements AC-009.5**
 
-The `Helmfiles` field uses `[]any` because entries can be either plain strings (glob patterns) or maps (with `path:`, `selectors:`, etc.). The parser normalizes these into `SubHelmfileEntry` values during processing.
+### Property 10: Local chart detection
 
-### Parser Changes
+*For any* string starting with `./`, `../`, or `/`, `isLocalChart` should return true. *For any* string that does not start with these prefixes (including strings like `repo/chart`, `oci://...`, or plain names), `isLocalChart` should return false.
 
-The `parseFile` method is extended with a post-parse step that resolves `helmfiles:` entries:
+**Validates: Requirements AC-010.1, AC-010.2, AC-010.4**
 
-```
-parseFile(path)
-  ├── read & unmarshal YAML
-  ├── for each entry in hf.Helmfiles:
-  │     ├── string entry → treat as glob pattern
-  │     │     └── filepath.Glob(basedir/pattern) → parse each match
-  │     └── map entry → extract "path" key
-  │           └── parse basedir/path
-  ├── merge sub-helmfile repos + releases into parent
-  └── return merged Helmfile
-```
+### Property 11: Local chart releases produce StatusSkipped
 
-### Glob Resolution
+*For any* release whose chart field is a local path (detected by `isLocalChart`), the checker should produce a finding with `StatusSkipped` and should not attempt any repository lookup.
 
-- Glob patterns are resolved relative to the directory of the parent helmfile using `filepath.Glob`.
-- If a glob matches zero files, no error is raised (AC-009.6).
-- The `FileReader` interface gains a `Glob(pattern string) ([]string, error)` method to keep filesystem operations mockable.
+**Validates: Requirements AC-010.1, AC-010.2, AC-010.3**
 
-### Selector Handling
+### Property 12: OCI tag filtering and latest version selection
 
-Selectors (`selectors:`, `selectorsInherited:`) are parsed but intentionally ignored. HDC needs to check ALL dependencies regardless of selector filtering (AC-009.4).
+*For any* list of OCI tags containing a mix of valid semver strings and non-semver strings (e.g. "latest", "dev"), the OCI client should filter to only valid semver tags and return the highest version as the latest.
 
-### Recursive Resolution
+**Validates: Requirements AC-011.2**
 
-Sub-helmfiles may themselves contain `helmfiles:` keys. The parser recursively follows these references (AC-009.8). A visited-path set prevents infinite loops from circular references.
+### Property 13: OCI repository detection
 
-### Error Handling
+*For any* URL string starting with `oci://`, `isOCIRepo` should return true. *For any* URL string starting with `http://`, `https://`, or any other scheme, `isOCIRepo` should return false.
 
-- Missing explicit path → error with file path in message (AC-009.5)
-- Missing glob match → silent continue (AC-009.6)
-- Parse error in sub-helmfile → propagated with context (which parent referenced it)
+**Validates: Requirements AC-011.4**
 
-### FileReader Interface Extension
+## Error Handling
 
-```go
-type FileReader interface {
-    ReadFile(path string) ([]byte, error)
-    ReadDir(path string) ([]os.DirEntry, error)
-    Glob(pattern string) ([]string, error)
-}
-```
+### Parser Errors
 
-The `osFileReader` implementation delegates to `filepath.Glob`. Mocks can return controlled results for testing.
+| Condition | Behavior |
+|-----------|----------|
+| File not found | Return error with file path |
+| Invalid YAML | Return error with file path and parse details |
+| Circular sub-helmfile reference | Return error identifying the cycle |
+| Missing explicit sub-helmfile path | Return error with missing path (AC-009.5) |
+| Glob matches zero files | Continue without error (AC-009.6) |
 
-## Design Principles
-1. Single Responsibility: each module has one clear purpose
-2. Dependency Injection: interfaces at all boundaries
-3. No Circular Dependencies: strict module hierarchy (models ← parser/repository ← checker ← report ← cmd)
-4. Minimal Public API: export only what's necessary
+### Checker Errors
+
+| Condition | Behavior |
+|-----------|----------|
+| `splitChart` fails (no `/` separator) | Finding with `StatusUnreachable` |
+| Repository not declared in helmfile | Finding with `StatusUnreachable` |
+| HTTP repository fetch fails | Finding with `StatusUnreachable`, log warning |
+| OCI registry unreachable | Finding with `StatusUnreachable`, message includes OCI URL |
+| Chart not found in index | Finding with `StatusUnreachable` |
+| Local chart reference | Finding with `StatusSkipped` (not an error) |
+
+### Repository Client Errors
+
+| Condition | Behavior |
+|-----------|----------|
+| HTTP non-200 response | Return error with status code |
+| Body read failure | Return error wrapping IO error |
+| Index YAML parse failure | Return error wrapping parse error |
+| OCI tags/list non-200 response | Return error with status code and OCI URL |
+| OCI tags/list invalid JSON | Return error wrapping JSON parse error |
+| No valid semver tags in OCI response | Return error indicating no versions found |
+
+## Testing Strategy
+
+### Dual Testing Approach
+
+The project uses both unit tests and property-based tests:
+
+- **Unit tests**: Specific examples, edge cases, error conditions, integration points. Use `testify/assert` and `testify/require` per project conventions.
+- **Property-based tests**: Universal properties across generated inputs. Use the `pgregory.net/rapid` library for Go property-based testing.
+
+### Property-Based Testing Configuration
+
+- **Library**: `pgregory.net/rapid` (Go-native, no external dependencies beyond the module)
+- **Minimum iterations**: 100 per property test
+- **Tag format**: Each property test must include a comment: `// Feature: helmfile-dependency-checker, Property {N}: {title}`
+- **Each correctness property is implemented by a single property-based test**
+
+### Unit Test Focus
+
+- Specific helmfile parsing examples (single file, directory, gotmpl)
+- HTTP client mock-based tests for repository fetching
+- OCI client mock-based tests for tag fetching
+- Report format validation (valid JSON, valid Markdown structure)
+- CLI flag binding and exit code behavior
+- Edge cases: empty helmfile, zero releases, circular references
+
+### Property Test Focus
+
+- Property 1: Generate random helmfile YAML, verify parse preserves all fields
+- Property 2: Generate random semver pairs, verify comparison correctness
+- Property 3: Generate releases with failing repos, verify StatusUnreachable
+- Property 4: Generate charts with random timestamps, verify age threshold
+- Property 5: Generate random findings, verify report contains all entries
+- Property 6: Generate random Result, verify HasIssues consistency
+- Property 7: Generate releases matching exclusion rules, verify skip behavior
+- Property 8: Generate parent + sub-helmfile structures, verify merge completeness
+- Property 9: Generate non-existent paths, verify error contains path
+- Property 10: Generate strings with/without path prefixes, verify isLocalChart
+- Property 11: Generate local-path releases, verify StatusSkipped without repo calls
+- Property 12: Generate mixed semver/non-semver tag lists, verify filtering and latest selection
+- Property 13: Generate URLs with various schemes, verify isOCIRepo detection

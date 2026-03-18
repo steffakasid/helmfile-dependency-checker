@@ -8,6 +8,7 @@ const (
 	StatusOutdated     Status = "outdated"
 	StatusUnmaintained Status = "unmaintained"
 	StatusUnreachable  Status = "unreachable"
+	StatusSkipped      Status = "skipped"
 )
 
 // Finding holds the check result for a single release.
