@@ -28,6 +28,48 @@ func New(format string) (Writer, error) {
 	}
 }
 
+// FilterSkipped returns a new Result with StatusSkipped findings removed.
+func FilterSkipped(result *models.Result) *models.Result {
+	filtered := make([]models.Finding, 0, len(result.Findings))
+	for _, f := range result.Findings {
+		if f.Status != models.StatusSkipped {
+			filtered = append(filtered, f)
+		}
+	}
+
+	return &models.Result{Findings: filtered}
+}
+
+// Counts holds summary counters for a Result.
+type Counts struct {
+	OK           int
+	Warnings     int
+	Errors       int
+	Skipped      int
+	Total        int
+}
+
+// CountFindings returns severity-classified counts from a Result.
+func CountFindings(result *models.Result) Counts {
+	var c Counts
+	c.Total = len(result.Findings)
+
+	for _, f := range result.Findings {
+		switch f.Status {
+		case models.StatusOK:
+			c.OK++
+		case models.StatusOutdated:
+			c.Warnings++
+		case models.StatusUnmaintained, models.StatusUnreachable:
+			c.Errors++
+		case models.StatusSkipped:
+			c.Skipped++
+		}
+	}
+
+	return c
+}
+
 // --- JSON ---
 
 type jsonWriter struct{}
@@ -80,6 +122,12 @@ func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
 		if _, err := fmt.Fprintln(w); err != nil {
 			return fmt.Errorf("failed to write markdown report: %w", err)
 		}
+	}
+
+	c := CountFindings(result)
+	if _, err := fmt.Fprintf(w, "---\n**Summary:** %d checked, %d ok, %d warnings, %d errors, %d skipped\n",
+		c.Total, c.OK, c.Warnings, c.Errors, c.Skipped); err != nil {
+		return fmt.Errorf("failed to write markdown report: %w", err)
 	}
 
 	return nil
