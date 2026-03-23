@@ -10,7 +10,7 @@ A standalone CLI tool that verifies Helm chart dependencies declared in helmfile
 - Generate reports in JSON, Markdown, or HTML format
 - Exclude specific charts or repositories from checks
 - Concurrent repository queries for fast execution
-- CI/CD friendly with non-zero exit codes on issues
+- CI/CD friendly with severity-based exit codes (`0` clean, `1` warnings, `2` errors)
 
 ## Limitations
 
@@ -102,10 +102,24 @@ hdc check helmfile.yaml -o json --output-file report.json
 
 ### CI/CD Integration
 
-Exit with non-zero code when outdated or unmaintained charts are found:
+HDC uses severity-based exit codes for CI/CD pipelines:
+
+| Exit Code | Meaning |
+|---|---|
+| `0` | All checks passed (no warnings or errors) |
+| `1` | Warnings found (outdated charts), but no errors |
+| `2` | Errors found (unmaintained or unreachable charts) |
 
 ```bash
-hdc check helmfile.yaml --fail-on-outdated
+hdc check helmfile.yaml
+```
+
+### Filtering Skipped Findings
+
+Omit local/skipped chart references from reports:
+
+```bash
+hdc check helmfile.yaml --ignore-skipped
 ```
 
 ### Directory-Based Helmfiles
@@ -162,10 +176,10 @@ log:
 
 output:
   format: markdown
+  ignore_skipped: false
 
 checker:
   max_age_months: 12
-  fail_on_outdated: false
   concurrent_requests: 5
 
 repositories:
@@ -186,7 +200,7 @@ All configuration keys can be set via environment variables with the prefix `HEL
 ```bash
 export HELMFILE_CHECKER_CHECKER_MAX_AGE_MONTHS=6
 export HELMFILE_CHECKER_OUTPUT_FORMAT=json
-export HELMFILE_CHECKER_CHECKER_FAIL_ON_OUTDATED=true
+export HELMFILE_CHECKER_OUTPUT_IGNORE_SKIPPED=true
 ```
 
 Configuration precedence: CLI flags > environment variables > config file > defaults.
@@ -199,8 +213,8 @@ Configuration precedence: CLI flags > environment variables > config file > defa
 | `log.format` | `--log-format` | `HELMFILE_CHECKER_LOG_FORMAT` | string | `text` | Log output format: `text`, `json` |
 | `output.format` | `-o`, `--output` | `HELMFILE_CHECKER_OUTPUT_FORMAT` | string | `markdown` | Report format: `json`, `markdown`, `html` |
 | `output.file` | `--output-file` | `HELMFILE_CHECKER_OUTPUT_FILE` | string | _(stdout)_ | Write report to file instead of stdout |
+| `output.ignore_skipped` | `--ignore-skipped` | `HELMFILE_CHECKER_OUTPUT_IGNORE_SKIPPED` | bool | `false` | Omit skipped findings from report output |
 | `checker.max_age_months` | `--max-age` | `HELMFILE_CHECKER_CHECKER_MAX_AGE_MONTHS` | int | `12` | Months since last chart update before flagged as unmaintained |
-| `checker.fail_on_outdated` | `--fail-on-outdated` | `HELMFILE_CHECKER_CHECKER_FAIL_ON_OUTDATED` | bool | `false` | Exit non-zero when outdated or unmaintained charts are found |
 | `checker.concurrent_requests` | `--concurrent` | `HELMFILE_CHECKER_CHECKER_CONCURRENT_REQUESTS` | int | `5` | Number of concurrent repository index fetches |
 | `repositories.timeout_seconds` | `--timeout` | `HELMFILE_CHECKER_REPOSITORIES_TIMEOUT_SECONDS` | int | `30` | HTTP timeout in seconds for repository requests |
 | `repositories.skip_tls_verify` | — | `HELMFILE_CHECKER_REPOSITORIES_SKIP_TLS_VERIFY` | bool | `false` | Skip TLS certificate verification (not recommended) |
@@ -239,7 +253,7 @@ Flags:
   -o, --output string        Output format: json, markdown, html (default "markdown")
       --output-file string   Write report to file instead of stdout
       --max-age int          Max chart age in months (default 12)
-      --fail-on-outdated     Exit non-zero if issues found
+      --ignore-skipped       Omit skipped findings from report output
       --concurrent int       Concurrent repo queries (default 5)
       --timeout int          Request timeout in seconds (default 30)
 
@@ -249,9 +263,17 @@ Global Flags:
       --log-format string    Log format: text, json (default "text")
 ```
 
+### Exit Codes
+
+| Code | Description |
+|---|---|
+| `0` | All dependencies are up-to-date and reachable |
+| `1` | Warnings only — outdated charts detected |
+| `2` | Errors — unmaintained or unreachable charts detected |
+
 ## CI/CD Integration Examples
 
-HDC is designed for pipeline use. The `--fail-on-outdated` flag causes a non-zero exit code when outdated or unmaintained charts are detected, making it easy to gate deployments.
+HDC uses severity-based exit codes: `0` for clean, `1` for warnings (outdated), `2` for errors (unmaintained/unreachable). Pipelines can distinguish yellow from red using the exit code directly.
 
 ### GitLab CI
 
@@ -262,11 +284,13 @@ check-helm-dependencies:
   before_script:
     - go install github.com/steffenrumpf/hdc/cmd@latest
   script:
-    - hdc check helmfile.yaml --fail-on-outdated -o json --output-file hdc-report.json
+    - hdc check helmfile.yaml -o json --output-file hdc-report.json
   artifacts:
     paths:
       - hdc-report.json
     when: always
+  allow_failure:
+    exit_codes: 1  # treat warnings as yellow, errors as red
 ```
 
 ### GitHub Actions
@@ -291,7 +315,7 @@ jobs:
           sudo mv hdc /usr/local/bin/
 
       - name: Check dependencies
-        run: hdc check helmfile.yaml --fail-on-outdated -o markdown --output-file report.md
+        run: hdc check helmfile.yaml -o markdown --output-file report.md
 
       - name: Upload report
         if: always()
@@ -305,18 +329,25 @@ jobs:
 
 ```bash
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 # Install
 curl -sLo hdc.tar.gz https://github.com/steffenrumpf/hdc/releases/latest/download/hdc_linux_amd64.tar.gz
 tar xzf hdc.tar.gz && chmod +x hdc
 
-# Run check — exits non-zero on outdated charts
+# Run check — exit 0=clean, 1=warnings, 2=errors
 ./hdc check helmfile.yaml \
-  --fail-on-outdated \
   --max-age 6 \
   -o json \
   --output-file hdc-report.json
+
+exit_code=$?
+if [ $exit_code -eq 2 ]; then
+  echo "Errors found — failing pipeline"
+  exit 2
+elif [ $exit_code -eq 1 ]; then
+  echo "Warnings found — review report"
+fi
 ```
 
 ### Scheduled Reporting (no failure on outdated)
