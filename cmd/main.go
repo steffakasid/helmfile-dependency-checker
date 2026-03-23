@@ -207,6 +207,8 @@ func classifyExitCode(result *models.Result) int {
 			hasWarning = true
 		case models.StatusUnmaintained, models.StatusUnreachable:
 			hasError = true
+		case models.StatusOK, models.StatusSkipped:
+			// Informational only — do not affect exit code.
 		}
 	}
 
