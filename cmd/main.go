@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/steffenrumpf/hdc/internal/checker"
 	"github.com/steffenrumpf/hdc/internal/config"
+	"github.com/steffenrumpf/hdc/internal/models"
 	"github.com/steffenrumpf/hdc/internal/parser"
 	"github.com/steffenrumpf/hdc/internal/report"
 	"github.com/steffenrumpf/hdc/internal/repository"
@@ -25,6 +27,11 @@ var (
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
+		var exitErr *exitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.code)
+		}
+
 		os.Exit(1)
 	}
 }
@@ -80,7 +87,7 @@ func newCheckCmd(cfgFile string) *cobra.Command {
 	cmd.Flags().StringP("output", "o", "markdown", "output format (json, markdown, html)")
 	cmd.Flags().String("output-file", "", "write report to file instead of stdout")
 	cmd.Flags().Int("max-age", 12, "maximum chart age in months before flagged as unmaintained")
-	cmd.Flags().Bool("fail-on-outdated", false, "exit non-zero if any outdated or unmaintained charts are found")
+	cmd.Flags().Bool("ignore-skipped", false, "omit skipped findings from report output")
 	cmd.Flags().Int("concurrent", 5, "number of concurrent repository queries")
 	cmd.Flags().Int("timeout", 30, "repository request timeout in seconds")
 
@@ -94,8 +101,8 @@ func bindCheckFlags(cmd *cobra.Command, cfg *config.Config) error {
 	}{
 		{"output", "output.format"},
 		{"output-file", "output.file"},
+		{"ignore-skipped", "output.ignore_skipped"},
 		{"max-age", "checker.max_age_months"},
-		{"fail-on-outdated", "checker.fail_on_outdated"},
 		{"concurrent", "checker.concurrent_requests"},
 		{"timeout", "repositories.timeout_seconds"},
 	}
@@ -108,8 +115,8 @@ func bindCheckFlags(cmd *cobra.Command, cfg *config.Config) error {
 
 	cfg.Output.Format = viper.GetString("output.format")
 	cfg.Output.File = viper.GetString("output.file")
+	cfg.Output.IgnoreSkipped = viper.GetBool("output.ignore_skipped")
 	cfg.Checker.MaxAgeMonths = viper.GetInt("checker.max_age_months")
-	cfg.Checker.FailOnOutdated = viper.GetBool("checker.fail_on_outdated")
 	cfg.Checker.ConcurrentRequests = viper.GetInt("checker.concurrent_requests")
 	cfg.Repositories.TimeoutSeconds = viper.GetInt("repositories.timeout_seconds")
 
@@ -141,6 +148,15 @@ func runCheck(helmfilePath string, cfg *config.Config) error {
 		return err
 	}
 
+	// Classify exit code from findings before any filtering.
+	exitCode := classifyExitCode(result)
+
+	// Apply ignore_skipped filter for report output only.
+	reportResult := result
+	if cfg.Output.IgnoreSkipped {
+		reportResult = report.FilterSkipped(result)
+	}
+
 	writer, err := report.New(cfg.Output.Format)
 	if err != nil {
 		return err
@@ -157,17 +173,51 @@ func runCheck(helmfilePath string, cfg *config.Config) error {
 		out = f
 	}
 
-	if err := writer.Write(out, result); err != nil {
+	if err := writer.Write(out, reportResult); err != nil {
 		return err
 	}
 
-	if cfg.Checker.FailOnOutdated && result.HasIssues() {
-		slog.Warn("issues found in helmfile dependencies")
+	counts := report.CountFindings(result)
+	if exitCode > 0 {
+		slog.Warn("issues found", "warnings", counts.Warnings, "errors", counts.Errors)
 
-		return fmt.Errorf("issues found in helmfile dependencies")
+		return &exitError{code: exitCode, message: fmt.Sprintf(
+			"%d warning(s), %d error(s) found", counts.Warnings, counts.Errors)}
 	}
 
 	return nil
+}
+
+// exitError carries a specific process exit code.
+type exitError struct {
+	code    int
+	message string
+}
+
+func (e *exitError) Error() string { return e.message }
+
+// classifyExitCode derives the process exit code from findings.
+// 0 = clean, 1 = warnings only, 2 = any errors.
+func classifyExitCode(result *models.Result) int {
+	var hasWarning, hasError bool
+
+	for _, f := range result.Findings {
+		switch f.Status {
+		case models.StatusOutdated:
+			hasWarning = true
+		case models.StatusUnmaintained, models.StatusUnreachable:
+			hasError = true
+		}
+	}
+
+	switch {
+	case hasError:
+		return 2
+	case hasWarning:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func newVersionCmd() *cobra.Command {
