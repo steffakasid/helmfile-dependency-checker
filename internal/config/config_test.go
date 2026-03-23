@@ -19,6 +19,7 @@ func TestInitConfig_Defaults(t *testing.T) {
 	assert.Equal(t, "info", cfg.Log.Level)
 	assert.Equal(t, "text", cfg.Log.Format)
 	assert.Equal(t, "markdown", cfg.Output.Format)
+	assert.False(t, cfg.Output.IgnoreSkipped)
 	assert.Equal(t, 12, cfg.Checker.MaxAgeMonths)
 	assert.Equal(t, 5, cfg.Checker.ConcurrentRequests)
 	assert.Equal(t, 30, cfg.Repositories.TimeoutSeconds)

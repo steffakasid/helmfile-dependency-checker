@@ -17,13 +17,13 @@ type Config struct {
 		Format string `mapstructure:"format"`
 	} `mapstructure:"log"`
 	Output struct {
-		Format string `mapstructure:"format"`
-		File   string `mapstructure:"file"`
+		Format        string `mapstructure:"format"`
+		File          string `mapstructure:"file"`
+		IgnoreSkipped bool   `mapstructure:"ignore_skipped"`
 	} `mapstructure:"output"`
 	Checker struct {
-		MaxAgeMonths       int  `mapstructure:"max_age_months"`
-		FailOnOutdated     bool `mapstructure:"fail_on_outdated"`
-		ConcurrentRequests int  `mapstructure:"concurrent_requests"`
+		MaxAgeMonths       int `mapstructure:"max_age_months"`
+		ConcurrentRequests int `mapstructure:"concurrent_requests"`
 	} `mapstructure:"checker"`
 	Repositories struct {
 		TimeoutSeconds int  `mapstructure:"timeout_seconds"`
@@ -53,6 +53,7 @@ func InitConfig(cfgFile string) (*Config, error) {
 	viper.SetDefault("log.level", "info")
 	viper.SetDefault("log.format", "text")
 	viper.SetDefault("output.format", "markdown")
+	viper.SetDefault("output.ignore_skipped", false)
 	viper.SetDefault("checker.max_age_months", 12)
 	viper.SetDefault("checker.concurrent_requests", 5)
 	viper.SetDefault("repositories.timeout_seconds", 30)
