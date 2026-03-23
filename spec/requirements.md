@@ -66,7 +66,8 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 **Acceptance Criteria:**
 - AC-006.1: Exit with non-zero code when issues found
 - AC-006.2: Support configuration via CLI arguments and config file
-- AC-006.3: Provide machine-readable output for automation
+- AC-006.3: WHEN the same setting is provided via both CLI arguments and config file, THE CLI argument SHALL take precedence
+- AC-006.4: Provide machine-readable output for automation
 
 ### US-007: Configure Thresholds and Rules
 **As a** DevOps engineer  
@@ -113,8 +114,11 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 **Acceptance Criteria:**
 - AC-010.1: WHEN a release references a chart using a relative path (e.g. `./charts/mychart`), THE Checker SHALL exclude that release from dependency checking
 - AC-010.2: WHEN a release references a chart using an absolute local path, THE Checker SHALL exclude that release from dependency checking
-- AC-010.3: WHEN a local chart reference is excluded, THE Report SHALL omit the release from findings or mark it as skipped with a clear reason
-- AC-010.4: THE Parser SHALL identify local chart references by detecting path prefixes such as `./`, `../`, or `/` in the chart field of a release
+- AC-010.3: WHEN a local chart reference is excluded, THE Report SHALL include the release as `skipped` with a clear reason by default
+- AC-010.4: THE CLI SHALL provide an `--ignore-skipped` option that omits `skipped` findings from report output
+- AC-010.5: WHEN `--ignore-skipped` is enabled, skipped findings SHALL be omitted from both human-readable and machine-readable report output, but dependency checking behavior SHALL remain unchanged
+- AC-010.6: `skipped` findings SHALL remain informational only and MUST NOT influence the exit code, regardless of whether `--ignore-skipped` is enabled
+- AC-010.7: THE Parser SHALL identify local chart references by detecting path prefixes such as `./`, `../`, or `/` in the chart field of a release
 
 ### US-011: Support OCI Repository References
 **As a** DevOps engineer  
@@ -140,8 +144,9 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 - Cross-platform (Linux, macOS, Windows)
 
 ### NFR-003: Security
-- Support authenticated Helm repositories
-- Handle credentials securely (no logging)
+- General authentication for Helm repositories SHALL NOT be supported in this version
+- OCI registries MAY be accessed using anonymous bearer-token challenge flows when required by the registry, but this SHALL be treated as a compatibility mechanism rather than a user-configurable authentication feature
+- The checker SHALL NOT require users to configure repository credentials
 - Validate SSL certificates by default
 
 ### NFR-004: Maintainability
@@ -153,3 +158,20 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 - Must not require Helm or helmfile binaries installed
 - Standalone executable preferred
 - Minimal external dependencies
+
+## Distinct Exit Codes for Warnings and Errors
+
+### User story
+As a CI/CD engineer, I want the dependency checker to return distinct exit codes for warnings and errors so that GitLab CI can distinguish yellow jobs from red failures without parsing human-readable output.
+
+### Acceptance criteria
+- When the checker completes without warnings or errors, it must exit with code `0`.
+- When the checker finds one or more warnings and no errors, it must exit with code `1`.
+- When the checker finds one or more errors, it must exit with code `2`, even if warnings are also present.
+- The three-level exit code scheme SHALL be the default and only supported CI/CD exit code behavior; legacy boolean fail modes SHALL NOT be preserved.
+- The checker SHALL classify findings with status `outdated` as warnings.
+- The checker SHALL classify findings with status `unmaintained` and `unreachable` as errors.
+- The checker SHALL treat findings with status `ok` and `skipped` as informational only and they MUST NOT influence the exit code.
+- Human-readable reports SHALL preserve the warning versus error distinction with different visual indicators, matching the status icons used by the current implementation.
+- The CLI output must still include the warning and error counts so the exit code is not the only signal.
+- The exit code behavior must be documented as part of the CLI requirements for CI/CD usage.

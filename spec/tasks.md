@@ -7,6 +7,8 @@
 - [x] 1.4 Configure mockery and generate mocks for all interfaces
 - [x] 1.5 Implement Config struct and InitConfig/InitLogger (`internal/config`)
 - [x] 1.6 Write config tests (`config_test.go`)
+- [ ] 1.7 Add `output.ignore_skipped` to config structs, defaults, and bindings
+- [ ] 1.8 Remove legacy `checker.fail_on_outdated` config support and references
 
 ## 2. Helmfile Parsing (US-001)
 - [x] 2.1 Implement helmfile.yaml single-file parsing (`internal/parser`)
@@ -33,25 +35,34 @@
 - [x] 5.2 Implement Markdown report writer
 - [x] 5.3 Implement HTML report writer
 - [x] 5.4 Write report tests (`report_test.go`)
+- [ ] 5.5 Add `ignore_skipped` filtering so skipped findings are omitted from JSON, Markdown, and HTML output when enabled
+- [ ] 5.6 Add warning and error summary counts to CLI-facing output while preserving existing status-specific visual indicators
 
 ## 6. CLI Wiring (US-006)
 - [x] 6.1 Implement root command with Cobra and global flags (`cmd/main.go`)
 - [x] 6.2 Implement `check` subcommand with flag binding
 - [x] 6.3 Implement `version` subcommand with ldflags injection
 - [x] 6.4 Wire config → parser → checker → report pipeline
-- [x] 6.5 Handle exit codes for CI/CD integration (fail-on-outdated)
+- [ ] 6.5 Replace legacy `fail-on-outdated` behavior with severity-based exit code classification (`0` clean, `1` warnings only, `2` any errors)
+- [ ] 6.6 Add `--ignore-skipped` CLI flag and bind it with CLI-over-config precedence
+- [ ] 6.7 Remove `--fail-on-outdated` from CLI help, flag binding, and runtime behavior
 
 ## 7. Quality & Verification
-- [x] 7.1 Ensure all linting rules pass (`make lint`)
-- [x] 7.2 Ensure all tests pass (`make test`)
-- [x] 7.3 Verify >80% test coverage for core packages (parser, repository, checker, config)
-- [x] 7.4 Verify snapshot build succeeds (`make snapshot`)
+- [ ] 7.1 Ensure all linting rules pass (`make lint`)
+- [ ] 7.2 Ensure all tests pass (`make test`)
+- [ ] 7.3 Verify >80% test coverage for core packages (parser, repository, checker, config)
+- [ ] 7.4 Verify snapshot build succeeds (`make snapshot`)
+- [ ] 7.5 Add test coverage for exit code classification (`0`, `1`, `2`) and severity mapping (`outdated` warning, `unmaintained`/`unreachable` error)
+- [ ] 7.6 Add test coverage for `ignore_skipped` filtering and confirm skipped findings never affect exit codes
+- [ ] 7.7 Add test coverage for CLI-over-config precedence and confirm removed legacy flags/config keys are rejected or absent
 
 ## 8. Documentation
 - [x] 8.1 Update README.md with usage instructions and examples
 - [x] 8.2 Add installation instructions (including Homebrew)
 - [x] 8.3 Add configuration reference
 - [x] 8.4 Add CI/CD integration examples
+- [ ] 8.5 Update README.md to document the `0`/`1`/`2` exit code contract and remove `--fail-on-outdated` references
+- [ ] 8.6 Document `--ignore-skipped`, CLI-over-config precedence, and authentication limitations consistently across README and CLI help
 
 ## 9. Homebrew Support via GoReleaser (US-008)
 - [ ] 9.1 Create `homebrew-tap` repository on GitHub (`steffenrumpf/homebrew-tap`)
@@ -86,6 +97,9 @@
 - [x] 11.8 Add unit test: report output includes or correctly handles `StatusSkipped` findings
 - [x] 11.9 Add property test: *for any* string with path prefix (`./`, `../`, `/`), `isLocalChart` returns true; for any string without, returns false (Property 10)
 - [x] 11.10 Ensure linting and all tests pass (`make lint && make test`)
+- [ ] 11.11 Add support for omitting `StatusSkipped` findings from report output when `ignore_skipped` is enabled
+- [ ] 11.12 Add unit tests verifying `ignore_skipped` removes skipped findings from JSON, Markdown, and HTML output only
+- [ ] 11.13 Add property test verifying `ignore_skipped` affects serialized output but not warning/error counts or derived exit codes (Property 14)
 
 ## 12. OCI Repository Support (US-011)
 - [x] 12.1 Add `FetchOCITags(ociURL string) (*Index, error)` method to `Client` interface in `internal/repository/client.go`

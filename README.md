@@ -12,6 +12,12 @@ A standalone CLI tool that verifies Helm chart dependencies declared in helmfile
 - Concurrent repository queries for fast execution
 - CI/CD friendly with non-zero exit codes on issues
 
+## Limitations
+
+- General authentication for HTTP/HTTPS Helm repositories is not supported.
+- OCI registries may work when they support the standard bearer-token challenge flow, but this is treated as limited compatibility support, not as a full authentication feature.
+- User-configured repository credentials are not supported.
+
 ## Installation
 
 ### Homebrew (macOS / Linux)

@@ -4,8 +4,9 @@
 
 The Helmfile Dependency Checker (hdc) is a standalone CLI tool that verifies Helm chart dependencies declared in helmfile configurations are up-to-date and actively maintained. It parses helmfile.yaml files (including directory structures, Go templates, and sub-helmfile references), queries Helm chart repositories for the latest versions, and generates reports in multiple formats (JSON, Markdown, HTML).
 
-This design covers the full feature set (US-001 through US-011), with particular focus on two new capabilities:
+This design covers the full feature set (US-001 through US-011), with particular focus on recent clarifications around CI/CD behavior and two dependency-resolution capabilities:
 
+- **CI/CD Exit Code Semantics**: The checker derives pipeline outcome from finding severity using a three-level exit code contract: `0` for no warnings or errors, `1` for warnings only, and `2` for any errors.
 - **US-010 — Local Chart Exclusion**: Automatically skip releases that reference local filesystem charts (`./`, `../`, `/` prefixes) since these cannot be checked against a remote repository.
 - **US-011 — OCI Repository Support**: Fetch chart version metadata from OCI-based registries (`oci://` scheme) using the OCI Distribution API, extending the existing HTTP-based repository client.
 
@@ -48,16 +49,22 @@ graph LR
    - Resolves repository URL from the repo name
    - Dispatches to HTTP or OCI client based on URL scheme (US-011)
    - Compares versions, checks maintenance age
-4. **Report Writer** formats findings to JSON/Markdown/HTML
+4. **Exit Code Classifier** derives warning and error counts from findings:
+    - `outdated` => warning
+    - `unmaintained`, `unreachable` => error
+    - `ok`, `skipped` => informational only
+5. **Report Writer** formats findings to JSON/Markdown/HTML and may omit `skipped` findings when `ignore_skipped` is enabled
 
 ### Key Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
 | Local charts detected in Checker, not Parser | Parser's job is structural parsing; the Checker decides what to check. `splitChart` would fail on paths anyway, so early detection avoids confusing error messages. |
-| New `StatusSkipped` status | Distinguishes intentionally-skipped releases from OK/excluded ones in reports, giving users clear visibility. |
+| New `StatusSkipped` status | Distinguishes intentionally-skipped releases from OK/excluded ones in reports, while still allowing them to be filtered from output when `ignore_skipped` is enabled. |
 | OCI support via separate `FetchOCITags` method on Client | Keeps the existing `FetchIndex` path untouched. OCI registries have a fundamentally different API (tags/list vs index.yaml). |
 | Semver filtering of OCI tags | OCI tag lists contain arbitrary strings; only valid semver tags should be considered for version comparison. |
+| Three-level exit codes replace legacy fail switches | CI systems need stable semantics that distinguish warnings from failures without additional parsing. A single exit-code strategy is simpler than preserving multiple overlapping modes. |
+| No user-configured repository authentication | Authentication is out of scope for this version. The implementation only keeps limited OCI bearer-token challenge compatibility where registries require it for otherwise anonymous access. |
 
 ## Components and Interfaces
 
@@ -73,6 +80,11 @@ graph LR
 
 **New**:
 - `StatusSkipped Status = "skipped"` — added to `result.go` for local chart references
+
+**Derived severity mapping**:
+- `StatusOutdated` => warning
+- `StatusUnmaintained`, `StatusUnreachable` => error
+- `StatusOK`, `StatusSkipped` => informational
 
 ### Parser (`internal/parser`)
 
@@ -94,6 +106,36 @@ func isLocalChart(chart string) bool {
 1. Check `isLocalChart(rel.Chart)` → return `StatusSkipped` finding
 2. Check `isOCIRelease(rel, repoByName)` → use OCI path
 3. Existing HTTP path (splitChart → FetchIndex → compare)
+
+**Exit code classification**:
+After all findings are produced, the CLI derives the process exit code from the aggregated result rather than from a boolean `fail-on-outdated` switch:
+
+```go
+func classifyExitCode(findings []models.Finding) int {
+    hasWarning := false
+    hasError := false
+
+    for _, finding := range findings {
+        switch finding.Status {
+        case models.StatusOutdated:
+            hasWarning = true
+        case models.StatusUnmaintained, models.StatusUnreachable:
+            hasError = true
+        }
+    }
+
+    switch {
+    case hasError:
+        return 2
+    case hasWarning:
+        return 1
+    default:
+        return 0
+    }
+}
+```
+
+`StatusOK` and `StatusSkipped` never affect the exit code.
 
 **OCI release detection**:
 ```go
@@ -123,6 +165,7 @@ type Client interface {
 5. Filter tags to valid semver only
 6. Build an `Index` with a single entry keyed by the chart name (last path segment)
 7. Each tag becomes a `ChartVersion` with `Created` set to zero time (OCI tags/list doesn't provide timestamps)
+8. If the registry responds with an OCI bearer-token challenge, the client may perform the anonymous token exchange and retry the request with an `Authorization: Bearer ...` header
 
 **OCI URL parsing helper**:
 ```go
@@ -139,7 +182,33 @@ Existing report writers already iterate `Result.Findings` and render based on `S
 - **Markdown**: row with "skipped" badge
 - **HTML**: row with neutral/grey styling
 
-Alternatively, skipped releases can be omitted from findings entirely (configurable). The default behavior is to include them with `StatusSkipped` for transparency.
+By default, skipped releases are included for transparency. When `ignore_skipped` is enabled, the reporting layer filters out `StatusSkipped` findings before serialization so both human-readable and machine-readable outputs omit them consistently.
+
+Human-readable reports must also preserve the warning-versus-error distinction using distinct visual indicators. The current Markdown mapping is:
+- `ok` => `✅`
+- `outdated` => `⚠️`
+- `unmaintained` => `🔴`
+- `unreachable` => `❌`
+- `skipped` => `⏭️`
+
+## Configuration
+
+Configuration is loaded from defaults, config file, and CLI flags, with this precedence order:
+
+1. CLI flags
+2. Config file
+3. Defaults
+
+Relevant options for the clarified behavior are:
+
+- `output.format` / `--output`: `json`, `markdown`, `html`
+- `output.file` / `--output-file`: write report to file
+- `output.ignore_skipped` / `--ignore-skipped`: omit `StatusSkipped` findings from report output
+- `checker.max_age_months` / `--max-age`: threshold for `unmaintained`
+- `checker.concurrent_requests` / `--concurrent`: concurrency limit
+- `repositories.timeout_seconds` / `--timeout`: network timeout
+
+The previous `fail_on_outdated` / `--fail-on-outdated` mode is removed from the target design. Exit behavior is always derived from severity classification.
 
 ## Data Models
 
@@ -184,10 +253,18 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 | Status | Meaning |
 |--------|---------|
 | `ok` | Chart is up-to-date and maintained |
-| `outdated` | Newer version available |
-| `unmaintained` | Latest release exceeds age threshold |
-| `unreachable` | Repository or chart not accessible |
+| `outdated` | Newer version available; classified as a warning |
+| `unmaintained` | Latest release exceeds age threshold; classified as an error |
+| `unreachable` | Repository or chart not accessible; classified as an error |
 | `skipped` | Local chart reference, not checked (NEW) |
+
+### Exit Code Contract
+
+| Exit Code | Condition |
+|-----------|-----------|
+| `0` | No warnings or errors |
+| `1` | One or more warnings and no errors |
+| `2` | One or more errors, regardless of warnings |
 
 
 ## Correctness Properties
@@ -224,11 +301,11 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 
 **Validates: Requirements AC-005.1, AC-005.2**
 
-### Property 6: HasIssues reflects non-OK findings
+### Property 6: Exit code classification reflects finding severity
 
-*For any* Result, `HasIssues()` should return true if and only if at least one finding has a status other than `StatusOK`.
+*For any* Result, exit code classification should return `0` when all findings are `ok` or `skipped`, `1` when at least one finding is `outdated` and none are `unmaintained` or `unreachable`, and `2` when at least one finding is `unmaintained` or `unreachable`.
 
-**Validates: Requirements AC-006.1**
+**Validates: Requirements AC-006.1, Distinct Exit Codes acceptance criteria**
 
 ### Property 7: Excluded charts are skipped
 
@@ -252,13 +329,19 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 
 *For any* string starting with `./`, `../`, or `/`, `isLocalChart` should return true. *For any* string that does not start with these prefixes (including strings like `repo/chart`, `oci://...`, or plain names), `isLocalChart` should return false.
 
-**Validates: Requirements AC-010.1, AC-010.2, AC-010.4**
+**Validates: Requirements AC-010.1, AC-010.2, AC-010.7**
 
 ### Property 11: Local chart releases produce StatusSkipped
 
 *For any* release whose chart field is a local path (detected by `isLocalChart`), the checker should produce a finding with `StatusSkipped` and should not attempt any repository lookup.
 
-**Validates: Requirements AC-010.1, AC-010.2, AC-010.3**
+**Validates: Requirements AC-010.1, AC-010.2, AC-010.3, AC-010.6**
+
+### Property 14: Ignoring skipped findings only affects report output
+
+*For any* set of findings, enabling `ignore_skipped` should remove only `StatusSkipped` findings from serialized report output and must not change warning counts, error counts, or derived exit code.
+
+**Validates: Requirements AC-010.4, AC-010.5, AC-010.6**
 
 ### Property 12: OCI tag filtering and latest version selection
 
@@ -295,6 +378,14 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 | Chart not found in index | Finding with `StatusUnreachable` |
 | Local chart reference | Finding with `StatusSkipped` (not an error) |
 
+### Repository Authentication Limitations
+
+| Condition | Behavior |
+|-----------|----------|
+| HTTP/HTTPS repository requires configured credentials | Unsupported in this version; request fails and is surfaced as unreachable |
+| OCI registry issues bearer-token challenge for anonymous pull | Client may exchange challenge for token and retry |
+| OCI registry requires interactive or user-supplied credentials | Unsupported in this version; request fails and is surfaced as unreachable |
+
 ### Repository Client Errors
 
 | Condition | Behavior |
@@ -328,7 +419,7 @@ The project uses both unit tests and property-based tests:
 - HTTP client mock-based tests for repository fetching
 - OCI client mock-based tests for tag fetching
 - Report format validation (valid JSON, valid Markdown structure)
-- CLI flag binding and exit code behavior
+- CLI flag binding, precedence, and exit code behavior
 - Edge cases: empty helmfile, zero releases, circular references
 
 ### Property Test Focus
@@ -338,7 +429,7 @@ The project uses both unit tests and property-based tests:
 - Property 3: Generate releases with failing repos, verify StatusUnreachable
 - Property 4: Generate charts with random timestamps, verify age threshold
 - Property 5: Generate random findings, verify report contains all entries
-- Property 6: Generate random Result, verify HasIssues consistency
+- Property 6: Generate random Result, verify exit code classification consistency
 - Property 7: Generate releases matching exclusion rules, verify skip behavior
 - Property 8: Generate parent + sub-helmfile structures, verify merge completeness
 - Property 9: Generate non-existent paths, verify error contains path
@@ -346,3 +437,4 @@ The project uses both unit tests and property-based tests:
 - Property 11: Generate local-path releases, verify StatusSkipped without repo calls
 - Property 12: Generate mixed semver/non-semver tag lists, verify filtering and latest selection
 - Property 13: Generate URLs with various schemes, verify isOCIRepo detection
+- Property 14: Generate mixed findings, verify `ignore_skipped` only affects serialized output
