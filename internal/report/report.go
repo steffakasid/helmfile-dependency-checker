@@ -42,11 +42,11 @@ func FilterSkipped(result *models.Result) *models.Result {
 
 // Counts holds summary counters for a Result.
 type Counts struct {
-	OK           int
-	Warnings     int
-	Errors       int
-	Skipped      int
-	Total        int
+	OK       int
+	Warnings int
+	Errors   int
+	Skipped  int
+	Total    int
 }
 
 // CountFindings returns severity-classified counts from a Result.
