@@ -453,3 +453,58 @@ func TestResult_HasIssues(t *testing.T) {
 		})
 	}
 }
+
+func TestIsOCIFromFlag(t *testing.T) {
+	tests := []struct {
+		name string
+		repo models.Repository
+		want bool
+	}{
+		{"oci true", models.Repository{Name: "test", URL: "registry.example.com", OCI: true}, true},
+		{"oci false", models.Repository{Name: "test", URL: "registry.example.com", OCI: false}, false},
+		{"oci not set", models.Repository{Name: "test", URL: "registry.example.com"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, checker.IsOCIFromFlag(tt.repo))
+		})
+	}
+}
+
+func TestCheck_OCI_Repository_With_Flag(t *testing.T) {
+	hf := &models.Helmfile{
+		Repositories: []models.Repository{
+			{Name: "myoci", URL: "registry.example.com/charts", OCI: true},
+		},
+		Releases: []models.Release{
+			{Name: "myapp", Chart: "myoci/myapp", Version: "1.0.0"},
+		},
+	}
+
+	idx := &repository.Index{
+		Entries: map[string][]repository.ChartVersion{
+			"myapp": {
+				{Version: "2.0.0", Created: time.Now()},
+				{Version: "1.0.0", Created: time.Now().Add(-24 * time.Hour)},
+			},
+		},
+	}
+
+	client := mocks.NewMockClient(t)
+	client.EXPECT().
+		FetchOCITags("oci://registry.example.com/charts/myapp").
+		Return(idx, nil)
+
+	chk := checker.New(client, checker.Config{MaxAgeMonths: 12, ConcurrentRequests: 1})
+	result, err := chk.Check(hf)
+	require.NoError(t, err)
+
+	require.Len(t, result.Findings, 1)
+	f := result.Findings[0]
+	assert.Equal(t, models.StatusOutdated, f.Status)
+	assert.Equal(t, "2.0.0", f.LatestVersion)
+	assert.Equal(t, "1.0.0", f.CurrentVersion)
+	assert.Contains(t, f.Message, "newer version")
+	client.AssertNotCalled(t, "FetchIndex")
+}

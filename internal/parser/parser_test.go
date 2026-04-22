@@ -506,3 +506,40 @@ func TestParse_Integration_OverlappingEntriesDetectedAsCircular(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "circular sub-helmfile reference detected")
 }
+
+func TestParse_OCI_Repository(t *testing.T) {
+	ociYAML := `
+repositories:
+  - name: myoci
+    url: registry.example.com/charts
+    oci: true
+  - name: regular
+    url: https://charts.example.com
+releases:
+  - name: myapp
+    namespace: default
+    chart: myoci/myapp
+    version: 1.0.0
+`
+
+	reader := mocks.NewMockFileReader(t)
+	reader.EXPECT().ReadDir("helmfile.yaml").Return(nil, errors.New("not a dir"))
+	reader.EXPECT().ReadFile("helmfile.yaml").Return([]byte(ociYAML), nil)
+
+	hf, err := parser.NewWithReader(reader).Parse("helmfile.yaml")
+	require.NoError(t, err)
+
+	assert.Len(t, hf.Repositories, 2)
+
+	// Check OCI repository
+	ociRepo := hf.Repositories[0]
+	assert.Equal(t, "myoci", ociRepo.Name)
+	assert.Equal(t, "registry.example.com/charts", ociRepo.URL)
+	assert.True(t, ociRepo.OCI)
+
+	// Check regular repository
+	regularRepo := hf.Repositories[1]
+	assert.Equal(t, "regular", regularRepo.Name)
+	assert.Equal(t, "https://charts.example.com", regularRepo.URL)
+	assert.False(t, regularRepo.OCI)
+}

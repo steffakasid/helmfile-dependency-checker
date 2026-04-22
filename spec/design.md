@@ -4,11 +4,12 @@
 
 The Helmfile Dependency Checker (hdc) is a standalone CLI tool that verifies Helm chart dependencies declared in helmfile configurations are up-to-date and actively maintained. It parses helmfile.yaml files (including directory structures, Go templates, and sub-helmfile references), queries Helm chart repositories for the latest versions, and generates reports in multiple formats (JSON, Markdown, HTML).
 
-This design covers the full feature set (US-001 through US-011), with particular focus on recent clarifications around CI/CD behavior and two dependency-resolution capabilities:
+This design covers the full feature set (US-001 through US-012), with particular focus on recent clarifications around CI/CD behavior and three dependency-resolution capabilities:
 
 - **CI/CD Exit Code Semantics**: The checker derives pipeline outcome from finding severity using a three-level exit code contract: `0` for no warnings or errors, `1` for warnings only, and `2` for any errors.
 - **US-010 — Local Chart Exclusion**: Automatically skip releases that reference local filesystem charts (`./`, `../`, `/` prefixes) since these cannot be checked against a remote repository.
 - **US-011 — OCI Repository Support**: Fetch chart version metadata from OCI-based registries (`oci://` scheme) using the OCI Distribution API, extending the existing HTTP-based repository client.
+- **US-012 — OCI Repositories with `oci: true` Flag**: Support helmfile's standard OCI repository definition format using the `oci: true` flag with registry URLs without protocol prefixes.
 
 ## Architecture
 
@@ -47,7 +48,7 @@ graph LR
 3. **Checker** iterates releases concurrently:
    - Skips excluded charts and local chart references (US-010)
    - Resolves repository URL from the repo name
-   - Dispatches to HTTP or OCI client based on URL scheme (US-011)
+   - Dispatches to HTTP or OCI client based on URL scheme or `oci: true` flag (US-011, US-012)
    - Compares versions, checks maintenance age
 4. **Exit Code Classifier** derives warning and error counts from findings:
     - `outdated` => warning
@@ -80,6 +81,7 @@ graph LR
 
 **New**:
 - `StatusSkipped Status = "skipped"` — added to `result.go` for local chart references
+- `Repository.OCI bool` — added to `helmfile.go` for `oci: true` flag support (US-012)
 
 **Derived severity mapping**:
 - `StatusOutdated` => warning
@@ -89,6 +91,8 @@ graph LR
 ### Parser (`internal/parser`)
 
 No changes required for US-010 or US-011. The parser already extracts `Repository.URL` and `Release.Chart` as raw strings. Detection of local paths and OCI schemes happens downstream in the checker and repository client.
+
+For US-012, the parser must extract the `oci: true` field from repository definitions to populate the new `Repository.OCI` boolean field.
 
 ### Checker (`internal/checker`)
 
@@ -104,7 +108,7 @@ func isLocalChart(chart string) bool {
 
 **Modified `checkRelease` flow**:
 1. Check `isLocalChart(rel.Chart)` → return `StatusSkipped` finding
-2. Check `isOCIRelease(rel, repoByName)` → use OCI path
+2. Check `isOCIRelease(rel, repoByName)` → use OCI path (detects both `oci://` URLs and `oci: true` flag)
 3. Existing HTTP path (splitChart → FetchIndex → compare)
 
 **Exit code classification**:
@@ -143,9 +147,14 @@ func classifyExitCode(findings []models.Finding) int {
 func isOCIRepo(repoURL string) bool {
     return strings.HasPrefix(repoURL, "oci://")
 }
+
+// isOCIFromFlag returns true if the repository has oci: true set.
+func isOCIFromFlag(repo models.Repository) bool {
+    return repo.OCI
+}
 ```
 
-For OCI releases, the chart name is extracted from the OCI URL rather than using `splitChart`. The OCI URL format is `oci://registry.example.com/path/to/chart`, and the chart name is the last path segment.
+For OCI releases, the chart name is extracted from the OCI URL rather than using `splitChart`. The OCI URL format is `oci://registry.example.com/path/to/chart`, and the chart name is the last path segment. For repositories defined with `oci: true`, the URL is constructed by prefixing the provided URL with `oci://`.
 
 ### Repository Client (`internal/repository`)
 
@@ -355,6 +364,18 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 
 **Validates: Requirements AC-011.4**
 
+### Property 15: OCI repository flag detection
+
+*For any* Repository struct with `OCI: true`, `isOCIFromFlag` should return true. *For any* Repository struct with `OCI: false` or unset, `isOCIFromFlag` should return false.
+
+**Validates: Requirements AC-012.1, AC-012.2**
+
+### Property 16: OCI repositories with flag use same fetching logic
+
+*For any* release whose repository has `oci: true` set, the checker should use the same OCI fetching and version comparison logic as releases with `oci://` prefixed repository URLs.
+
+**Validates: Requirements AC-012.3, AC-012.4, AC-012.5**
+
 ## Error Handling
 
 ### Parser Errors
@@ -438,3 +459,5 @@ The project uses both unit tests and property-based tests:
 - Property 12: Generate mixed semver/non-semver tag lists, verify filtering and latest selection
 - Property 13: Generate URLs with various schemes, verify isOCIRepo detection
 - Property 14: Generate mixed findings, verify `ignore_skipped` only affects serialized output
+- Property 15: Generate Repository structs with random OCI flag values, verify isOCIFromFlag detection
+- Property 16: Generate releases with `oci: true` repositories, verify same OCI logic as `oci://` URLs

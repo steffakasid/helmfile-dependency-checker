@@ -116,3 +116,17 @@
 - [x] 12.12 Add property test: *for any* list of mixed semver/non-semver tags, OCI client returns only valid semver entries with correct latest (Property 12)
 - [x] 12.13 Add property test: *for any* URL with `oci://` prefix, `isOCIRepo` returns true; for any other scheme, returns false (Property 13)
 - [x] 12.14 Ensure linting and all tests pass (`make lint && make test`)
+
+## 13. OCI Repositories with `oci: true` Flag (US-012)
+- [x] 13.1 Add `OCI bool` field to `models.Repository` struct in `internal/models/helmfile.go`
+- [x] 13.2 Update parser to parse `oci: true` field from repository definitions in helmfile YAML
+- [x] 13.3 Implement `isOCIFromFlag(repo models.Repository) bool` helper that returns true when `repo.OCI` is true
+- [x] 13.4 Modify `isOCIRepo` or add new helper to detect OCI repositories from both URL prefix and `oci: true` flag
+- [x] 13.5 Update repository URL construction to prefix URLs with `oci://` when `oci: true` is set and URL lacks protocol prefix
+- [x] 13.6 Regenerate mocks for updated `Repository` model if needed (`make generate` or mockery)
+- [x] 13.7 Add unit test: parser correctly parses `oci: true` field from repository definitions
+- [x] 13.8 Add unit test: `isOCIFromFlag` returns true for repositories with `OCI: true`
+- [x] 13.9 Add unit test: repository URL construction prefixes registry URLs with `oci://` when `oci: true` is set
+- [x] 13.10 Add unit test: checker handles repositories defined with `oci: true` using the same OCI fetching logic
+- [x] 13.11 Add integration test with helmfile containing `oci: true` repository definitions
+- [x] 13.12 Ensure linting and all tests pass (`make lint && make test`)

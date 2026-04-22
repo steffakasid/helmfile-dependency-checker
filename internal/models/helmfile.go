@@ -3,6 +3,7 @@ package models
 type Repository struct {
 	Name string `yaml:"name"`
 	URL  string `yaml:"url"`
+	OCI  bool   `yaml:"oci"`
 }
 
 type Release struct {

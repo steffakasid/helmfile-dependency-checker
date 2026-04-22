@@ -132,6 +132,18 @@ A tool to verify that Helm chart dependencies declared in helmfiles are up-to-da
 - AC-011.4: THE Parser SHALL recognize `oci://` prefixed repository URLs and pass them to the OCI-aware Repository_Client
 - AC-011.5: WHEN OCI chart versions are retrieved, THE Checker SHALL compare the current version against the latest available version using the same semantic versioning logic as HTTP/HTTPS repositories
 
+### US-012: Support OCI Repositories Defined with `oci: true` Flag
+**As a** DevOps engineer  
+**I want to** have hdc handle OCI repositories defined in helmfile with the `oci: true` flag and registry URL without protocol prefix  
+**So that** charts from OCI repositories configured in the standard helmfile format are included in dependency checking
+
+**Acceptance Criteria:**
+- AC-012.1: WHEN a repository is defined with `oci: true` and a URL without protocol prefix (e.g. `registry.example.com/charts`), THE Parser SHALL recognize it as an OCI repository
+- AC-012.2: WHEN parsing repositories with `oci: true`, THE Parser SHALL construct the appropriate OCI URL by prefixing the provided URL with `oci://`
+- AC-012.3: THE Repository_Client SHALL handle repositories identified as OCI through the `oci: true` flag using the same OCI fetching logic as `oci://` prefixed URLs
+- AC-012.4: WHEN an OCI repository defined with `oci: true` is unreachable or returns an error, THEN THE Checker SHALL report the failure with a descriptive error including the original repository URL
+- AC-012.5: THE Helmfile model SHALL include an `OCI` field in the Repository struct to capture the `oci: true` flag from the YAML structure
+
 ## Non-Functional Requirements
 
 ### NFR-001: Performance

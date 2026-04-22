@@ -1,0 +1,16 @@
+repositories:
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: myoci
+    url: registry.example.com/charts
+    oci: true
+
+releases:
+  - name: redis
+    namespace: cache
+    chart: bitnami/redis
+    version: 16.13.0
+  - name: myapp
+    namespace: default
+    chart: myoci/myapp
+    version: 1.0.0

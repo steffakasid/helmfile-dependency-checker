@@ -45,9 +45,9 @@ func New(client repository.Client, cfg Config) Checker {
 
 // Check evaluates all releases in hf and returns a Result.
 func (c *checker) Check(hf *models.Helmfile) (*models.Result, error) {
-	repoByName := make(map[string]string, len(hf.Repositories))
+	repoByName := make(map[string]models.Repository, len(hf.Repositories))
 	for _, r := range hf.Repositories {
-		repoByName[r.Name] = r.URL
+		repoByName[r.Name] = r
 	}
 
 	sem := make(chan struct{}, max(c.cfg.ConcurrentRequests, 1))
@@ -79,7 +79,7 @@ func (c *checker) Check(hf *models.Helmfile) (*models.Result, error) {
 	return &models.Result{Findings: findings}, nil
 }
 
-func (c *checker) checkRelease(rel models.Release, repoByName map[string]string) models.Finding {
+func (c *checker) checkRelease(rel models.Release, repoByName map[string]models.Repository) models.Finding {
 	if isLocalChart(rel.Chart) {
 		return models.Finding{
 			Release: rel,
@@ -89,7 +89,7 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 	}
 
 	// OCI URL directly in the chart field (e.g. oci://registry/org/chart).
-	if isOCIRepo(rel.Chart) {
+	if IsOCIRepo(rel.Chart) {
 		return c.checkOCIRelease(rel, rel.Chart, "")
 	}
 
@@ -102,7 +102,7 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 		}
 	}
 
-	repoURL, ok := repoByName[repoName]
+	repo, ok := repoByName[repoName]
 	if !ok {
 		return models.Finding{
 			Release: rel,
@@ -111,11 +111,17 @@ func (c *checker) checkRelease(rel models.Release, repoByName map[string]string)
 		}
 	}
 
+	repoURL := repo.URL
 	if c.isRepoExcluded(repoURL) {
 		return models.Finding{Release: rel, Status: models.StatusOK, Message: "excluded"}
 	}
 
-	if isOCIRepo(repoURL) {
+	// Check if this is an OCI repository (either by URL scheme or oci: true flag)
+	if IsOCIRepo(repoURL) || IsOCIFromFlag(repo) {
+		// For repositories with oci: true, construct the full OCI URL
+		if IsOCIFromFlag(repo) && !IsOCIRepo(repoURL) {
+			repoURL = "oci://" + repoURL
+		}
 		return c.checkOCIRelease(rel, repoURL, chartName)
 	}
 
@@ -261,9 +267,14 @@ func (c *checker) isRepoExcluded(repoURL string) bool {
 	return false
 }
 
-// isOCIRepo returns true if the repository URL uses the oci:// scheme.
-func isOCIRepo(repoURL string) bool {
+// IsOCIRepo returns true if the repository URL uses the oci:// scheme.
+func IsOCIRepo(repoURL string) bool {
 	return strings.HasPrefix(repoURL, "oci://")
+}
+
+// IsOCIFromFlag returns true if the repository has oci: true set.
+func IsOCIFromFlag(repo models.Repository) bool {
+	return repo.OCI
 }
 
 // isLocalChart returns true if the chart field is a local filesystem path.
