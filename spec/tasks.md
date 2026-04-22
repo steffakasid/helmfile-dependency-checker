@@ -43,7 +43,7 @@
 - [x] 6.2 Implement `check` subcommand with flag binding
 - [x] 6.3 Implement `version` subcommand with ldflags injection
 - [x] 6.4 Wire config → parser → checker → report pipeline
-- [ ] 6.5 Replace legacy `fail-on-outdated` behavior with severity-based exit code classification (`0` clean, `1` warnings only, `2` any errors)
+- [x] 6.5 Replace legacy `fail-on-outdated` behavior with severity-based exit code classification (`0` clean, `1` warnings only, `2` any errors)
 - [ ] 6.6 Add `--ignore-skipped` CLI flag and bind it with CLI-over-config precedence
 - [ ] 6.7 Remove `--fail-on-outdated` from CLI help, flag binding, and runtime behavior
 
@@ -52,7 +52,7 @@
 - [ ] 7.2 Ensure all tests pass (`make test`)
 - [ ] 7.3 Verify >80% test coverage for core packages (parser, repository, checker, config)
 - [ ] 7.4 Verify snapshot build succeeds (`make snapshot`)
-- [ ] 7.5 Add test coverage for exit code classification (`0`, `1`, `2`) and severity mapping (`outdated` warning, `unmaintained`/`unreachable` error)
+- [x] 7.5 Add test coverage for exit code classification (`0`, `1`, `2`) and severity mapping (`outdated` warning, `unmaintained`/`unreachable` error)
 - [ ] 7.6 Add test coverage for `ignore_skipped` filtering and confirm skipped findings never affect exit codes
 - [ ] 7.7 Add test coverage for CLI-over-config precedence and confirm removed legacy flags/config keys are rejected or absent
 

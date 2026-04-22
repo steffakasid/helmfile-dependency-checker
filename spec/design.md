@@ -370,7 +370,19 @@ Only tags matching semver pattern (`X.Y.Z` with optional `v` prefix and pre-rele
 
 **Validates: Requirements AC-012.1, AC-012.2**
 
-### Property 16: OCI repositories with flag use same fetching logic
+### Property 16: Result severity classification
+
+*For any* Result, `HasErrors` should return true if any finding has `StatusUnmaintained` or `StatusUnreachable`. `HasErrors` should return false if all findings are `StatusOK`, `StatusOutdated`, or `StatusSkipped`. `HasWarnings` should return true if any finding has `StatusOutdated` and no findings have `StatusUnmaintained` or `StatusUnreachable`. `HasWarnings` should return false if any finding has `StatusUnmaintained` or `StatusUnreachable`, or if no findings have `StatusOutdated`.
+
+**Validates: Requirements AC-006.1**
+
+### Property 17: Exit code calculation
+
+*For any* Result, `ExitCode` should return `0` if no findings have `StatusOutdated`, `StatusUnmaintained`, or `StatusUnreachable`. `ExitCode` should return `1` if any finding has `StatusOutdated` and no findings have `StatusUnmaintained` or `StatusUnreachable`. `ExitCode` should return `2` if any finding has `StatusUnmaintained` or `StatusUnreachable`.
+
+**Validates: Requirements AC-006.1, Distinct Exit Codes acceptance criteria**
+
+### Property 18: OCI repositories with flag use same fetching logic
 
 *For any* release whose repository has `oci: true` set, the checker should use the same OCI fetching and version comparison logic as releases with `oci://` prefixed repository URLs.
 
@@ -460,4 +472,6 @@ The project uses both unit tests and property-based tests:
 - Property 13: Generate URLs with various schemes, verify isOCIRepo detection
 - Property 14: Generate mixed findings, verify `ignore_skipped` only affects serialized output
 - Property 15: Generate Repository structs with random OCI flag values, verify isOCIFromFlag detection
-- Property 16: Generate releases with `oci: true` repositories, verify same OCI logic as `oci://` URLs
+- Property 16: Generate random Result with mixed findings, verify HasErrors/HasWarnings severity classification
+- Property 17: Generate random Result with mixed findings, verify ExitCode returns correct severity level (0/1/2)
+- Property 18: Generate releases with `oci: true` repositories, verify same OCI logic as `oci://` URLs

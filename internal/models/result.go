@@ -35,3 +35,41 @@ func (r *Result) HasIssues() bool {
 	}
 	return false
 }
+
+// HasErrors returns true when any finding has errors (unmaintained or unreachable).
+func (r *Result) HasErrors() bool {
+	for _, f := range r.Findings {
+		if f.Status == StatusUnmaintained || f.Status == StatusUnreachable {
+			return true
+		}
+	}
+	return false
+}
+
+// HasWarnings returns true when any finding has warnings (outdated) but no errors.
+func (r *Result) HasWarnings() bool {
+	hasWarnings := false
+	for _, f := range r.Findings {
+		if f.Status == StatusUnmaintained || f.Status == StatusUnreachable {
+			return false // errors take precedence
+		}
+		if f.Status == StatusOutdated {
+			hasWarnings = true
+		}
+	}
+	return hasWarnings
+}
+
+// ExitCode returns the appropriate exit code based on finding severity:
+// 0 = no issues or only skipped
+// 1 = warnings only (outdated charts)
+// 2 = errors (unmaintained or unreachable charts).
+func (r *Result) ExitCode() int {
+	if r.HasErrors() {
+		return 2
+	}
+	if r.HasWarnings() {
+		return 1
+	}
+	return 0
+}

@@ -147,13 +147,13 @@ func runCheck(helmfilePath string, cfg *config.Config) error {
 	}
 
 	out := os.Stdout
+	var f *os.File
 	if cfg.Output.File != "" {
-		f, err := os.Create(cfg.Output.File)
+		var err error
+		f, err = os.Create(cfg.Output.File)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer f.Close() //nolint:errcheck
-
 		out = f
 	}
 
@@ -161,13 +161,20 @@ func runCheck(helmfilePath string, cfg *config.Config) error {
 		return err
 	}
 
-	if cfg.Checker.FailOnOutdated && result.HasIssues() {
-		slog.Warn("issues found in helmfile dependencies")
-
-		return fmt.Errorf("issues found in helmfile dependencies")
+	// Close file if it was opened
+	if f != nil {
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("failed to close output file: %w", err)
+		}
 	}
 
-	return nil
+	// Exit with severity-based exit code
+	exitCode := result.ExitCode()
+	if exitCode > 0 {
+		slog.Warn("issues found in helmfile dependencies", "exit_code", exitCode)
+	}
+	os.Exit(exitCode)
+	return nil // This line is never reached but satisfies the compiler
 }
 
 func newVersionCmd() *cobra.Command {

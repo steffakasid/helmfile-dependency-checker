@@ -454,6 +454,91 @@ func TestResult_HasIssues(t *testing.T) {
 	}
 }
 
+func TestResult_HasErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		findings []models.Finding
+		want     bool
+	}{
+		{"no issues", []models.Finding{{Status: models.StatusOK}}, false},
+		{"outdated only", []models.Finding{{Status: models.StatusOutdated}}, false},
+		{"unmaintained", []models.Finding{{Status: models.StatusUnmaintained}}, true},
+		{"unreachable", []models.Finding{{Status: models.StatusUnreachable}}, true},
+		{"mixed with errors", []models.Finding{
+			{Status: models.StatusOutdated},
+			{Status: models.StatusUnmaintained},
+		}, true},
+		{"mixed without errors", []models.Finding{
+			{Status: models.StatusOK},
+			{Status: models.StatusOutdated},
+		}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &models.Result{Findings: tt.findings}
+			assert.Equal(t, tt.want, r.HasErrors())
+		})
+	}
+}
+
+func TestResult_HasWarnings(t *testing.T) {
+	tests := []struct {
+		name     string
+		findings []models.Finding
+		want     bool
+	}{
+		{"no issues", []models.Finding{{Status: models.StatusOK}}, false},
+		{"outdated only", []models.Finding{{Status: models.StatusOutdated}}, true},
+		{"unmaintained", []models.Finding{{Status: models.StatusUnmaintained}}, false},
+		{"unreachable", []models.Finding{{Status: models.StatusUnreachable}}, false},
+		{"mixed with errors", []models.Finding{
+			{Status: models.StatusOutdated},
+			{Status: models.StatusUnmaintained},
+		}, false},
+		{"mixed without errors", []models.Finding{
+			{Status: models.StatusOK},
+			{Status: models.StatusOutdated},
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &models.Result{Findings: tt.findings}
+			assert.Equal(t, tt.want, r.HasWarnings())
+		})
+	}
+}
+
+func TestResult_ExitCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		findings []models.Finding
+		want     int
+	}{
+		{"no issues", []models.Finding{{Status: models.StatusOK}}, 0},
+		{"skipped only", []models.Finding{{Status: models.StatusSkipped}}, 0},
+		{"outdated only", []models.Finding{{Status: models.StatusOutdated}}, 1},
+		{"unmaintained", []models.Finding{{Status: models.StatusUnmaintained}}, 2},
+		{"unreachable", []models.Finding{{Status: models.StatusUnreachable}}, 2},
+		{"mixed with errors", []models.Finding{
+			{Status: models.StatusOutdated},
+			{Status: models.StatusUnmaintained},
+		}, 2},
+		{"mixed warnings only", []models.Finding{
+			{Status: models.StatusOK},
+			{Status: models.StatusOutdated},
+		}, 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &models.Result{Findings: tt.findings}
+			assert.Equal(t, tt.want, r.ExitCode())
+		})
+	}
+}
+
 func TestIsOCIFromFlag(t *testing.T) {
 	tests := []struct {
 		name string

@@ -100,6 +100,114 @@ func TestProperty15_IsOCIFromFlag_WithFlagUnset(t *testing.T) {
 	})
 }
 
+// Feature: helmfile-dependency-checker, Property 16: Result severity classification
+//
+// HasErrors returns true if any finding has StatusUnmaintained or StatusUnreachable.
+// HasErrors returns false if all findings are StatusOK, StatusOutdated, or StatusSkipped.
+// HasWarnings returns true if any finding has StatusOutdated and no findings have StatusUnmaintained or StatusUnreachable.
+// HasWarnings returns false if any finding has StatusUnmaintained or StatusUnreachable, or if no findings have StatusOutdated.
+
+func TestProperty16_ResultSeverityClassification(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		// Generate a list of findings with various statuses
+		findings := rapid.SliceOf(rapid.Custom(func(t *rapid.T) models.Finding {
+			status := rapid.SampledFrom([]models.Status{
+				models.StatusOK,
+				models.StatusOutdated,
+				models.StatusUnmaintained,
+				models.StatusUnreachable,
+				models.StatusSkipped,
+			}).Draw(t, "status")
+			return models.Finding{Status: status}
+		})).Draw(t, "findings")
+
+		result := &models.Result{Findings: findings}
+
+		hasErrors := result.HasErrors()
+		hasWarnings := result.HasWarnings()
+
+		// Verify HasErrors logic
+		expectedHasErrors := false
+		for _, f := range findings {
+			if f.Status == models.StatusUnmaintained || f.Status == models.StatusUnreachable {
+				expectedHasErrors = true
+				break
+			}
+		}
+		if hasErrors != expectedHasErrors {
+			t.Fatalf("HasErrors() = %v, expected %v for findings %+v", hasErrors, expectedHasErrors, findings)
+		}
+
+		// Verify HasWarnings logic
+		expectedHasWarnings := false
+		hasAnyErrors := false
+		for _, f := range findings {
+			if f.Status == models.StatusUnmaintained || f.Status == models.StatusUnreachable {
+				hasAnyErrors = true
+				break
+			}
+			if f.Status == models.StatusOutdated {
+				expectedHasWarnings = true
+			}
+		}
+		if hasAnyErrors {
+			expectedHasWarnings = false
+		}
+		if hasWarnings != expectedHasWarnings {
+			t.Fatalf("HasWarnings() = %v, expected %v for findings %+v", hasWarnings, expectedHasWarnings, findings)
+		}
+	})
+}
+
+// Feature: helmfile-dependency-checker, Property 17: Exit code calculation
+//
+// ExitCode returns 0 if no findings have StatusOutdated, StatusUnmaintained, or StatusUnreachable.
+// ExitCode returns 1 if any finding has StatusOutdated and no findings have StatusUnmaintained or StatusUnreachable.
+// ExitCode returns 2 if any finding has StatusUnmaintained or StatusUnreachable.
+
+func TestProperty17_ExitCodeCalculation(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		// Generate a list of findings with various statuses
+		findings := rapid.SliceOf(rapid.Custom(func(t *rapid.T) models.Finding {
+			status := rapid.SampledFrom([]models.Status{
+				models.StatusOK,
+				models.StatusOutdated,
+				models.StatusUnmaintained,
+				models.StatusUnreachable,
+				models.StatusSkipped,
+			}).Draw(t, "status")
+			return models.Finding{Status: status}
+		})).Draw(t, "findings")
+
+		result := &models.Result{Findings: findings}
+		exitCode := result.ExitCode()
+
+		// Determine expected exit code
+		hasErrors := false
+		hasWarnings := false
+		for _, f := range findings {
+			if f.Status == models.StatusUnmaintained || f.Status == models.StatusUnreachable {
+				hasErrors = true
+				break
+			}
+			if f.Status == models.StatusOutdated {
+				hasWarnings = true
+			}
+		}
+
+		expectedExitCode := 0
+		if hasErrors {
+			expectedExitCode = 2
+		} else if hasWarnings {
+			expectedExitCode = 1
+		}
+
+		if exitCode != expectedExitCode {
+			t.Fatalf("ExitCode() = %d, expected %d for findings %+v", exitCode, expectedExitCode, findings)
+		}
+	})
+}
+
 // Feature: helmfile-dependency-checker, Property 16: OCI repositories with flag use same fetching logic
 //
 // For any release whose repository has `oci: true` set, the checker should use
