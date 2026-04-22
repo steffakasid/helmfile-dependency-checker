@@ -48,10 +48,10 @@
 - [ ] 6.7 Remove `--fail-on-outdated` from CLI help, flag binding, and runtime behavior
 
 ## 7. Quality & Verification
-- [ ] 7.1 Ensure all linting rules pass (`make lint`)
-- [ ] 7.2 Ensure all tests pass (`make test`)
-- [ ] 7.3 Verify >80% test coverage for core packages (parser, repository, checker, config)
-- [ ] 7.4 Verify snapshot build succeeds (`make snapshot`)
+- [x] 7.1 Ensure all linting rules pass (`make lint`)
+- [x] 7.2 Ensure all tests pass (`make test`)
+- [x] 7.3 Verify >80% test coverage for core packages (parser, repository, checker, config)
+- [x] 7.4 Verify snapshot build succeeds (`make snapshot`)
 - [x] 7.5 Add test coverage for exit code classification (`0`, `1`, `2`) and severity mapping (`outdated` warning, `unmaintained`/`unreachable` error)
 - [ ] 7.6 Add test coverage for `ignore_skipped` filtering and confirm skipped findings never affect exit codes
 - [ ] 7.7 Add test coverage for CLI-over-config precedence and confirm removed legacy flags/config keys are rejected or absent
