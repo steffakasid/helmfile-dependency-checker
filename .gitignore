@@ -8,6 +8,11 @@
 # Build artifacts
 dist/
 
+# Test artifacts
+hdc-test
+test-output.log
+coverage.out
+
 # Test binary
 *.test
 
