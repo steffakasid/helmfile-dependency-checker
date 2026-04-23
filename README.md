@@ -12,11 +12,21 @@ A standalone CLI tool that verifies Helm chart dependencies declared in helmfile
 - Concurrent repository queries for fast execution
 - CI/CD friendly with non-zero exit codes on issues
 
+## Exit Codes
+
+HDC uses severity-based exit codes for CI/CD integration:
+
+- **Exit code 0**: No issues found (all charts are up-to-date and actively maintained)
+- **Exit code 1**: Warnings only (some charts are outdated but maintained)
+- **Exit code 2**: Errors found (some charts are unmaintained or unreachable)
+
+**Note:** Skipped releases (local charts) never affect the exit code.
+
 ## Limitations
 
 - General authentication for HTTP/HTTPS Helm repositories is not supported.
 - OCI registries may work when they support the standard bearer-token challenge flow, but this is treated as limited compatibility support, not as a full authentication feature.
-- User-configured repository credentials are not supported.
+- User-configured repository credentials are not supported. Authentication is read-only and limited to anonymous access or standard bearer-token challenges.
 
 ## Installation
 
@@ -100,12 +110,11 @@ hdc check helmfile.yaml -o html
 hdc check helmfile.yaml -o json --output-file report.json
 ```
 
-### CI/CD Integration
-
-Exit with non-zero code when outdated or unmaintained charts are found:
+### Filtering Output
 
 ```bash
-hdc check helmfile.yaml --fail-on-outdated
+# Omit skipped releases (local charts) from report
+hdc check helmfile.yaml --ignore-skipped
 ```
 
 ### Directory-Based Helmfiles
@@ -162,10 +171,10 @@ log:
 
 output:
   format: markdown
+  ignore_skipped: false
 
 checker:
   max_age_months: 12
-  fail_on_outdated: false
   concurrent_requests: 5
 
 repositories:
@@ -186,10 +195,19 @@ All configuration keys can be set via environment variables with the prefix `HEL
 ```bash
 export HELMFILE_CHECKER_CHECKER_MAX_AGE_MONTHS=6
 export HELMFILE_CHECKER_OUTPUT_FORMAT=json
-export HELMFILE_CHECKER_CHECKER_FAIL_ON_OUTDATED=true
+export HELMFILE_CHECKER_OUTPUT_IGNORE_SKIPPED=true
 ```
 
-Configuration precedence: CLI flags > environment variables > config file > defaults.
+### Configuration Precedence
+
+Settings are resolved in this order (highest to lowest priority):
+
+1. **CLI flags** (e.g., `--output`, `--ignore-skipped`)
+2. **Environment variables** (e.g., `HELMFILE_CHECKER_OUTPUT_FORMAT`)
+3. **Config file** (`.helmfile-checker.yaml` or path specified with `-c`)
+4. **Defaults** (built-in values)
+
+This means CLI flags always override config file and environment variable settings.
 
 ## Configuration Reference
 
@@ -199,8 +217,8 @@ Configuration precedence: CLI flags > environment variables > config file > defa
 | `log.format` | `--log-format` | `HELMFILE_CHECKER_LOG_FORMAT` | string | `text` | Log output format: `text`, `json` |
 | `output.format` | `-o`, `--output` | `HELMFILE_CHECKER_OUTPUT_FORMAT` | string | `markdown` | Report format: `json`, `markdown`, `html` |
 | `output.file` | `--output-file` | `HELMFILE_CHECKER_OUTPUT_FILE` | string | _(stdout)_ | Write report to file instead of stdout |
+| `output.ignore_skipped` | `--ignore-skipped` | `HELMFILE_CHECKER_OUTPUT_IGNORE_SKIPPED` | bool | `false` | Omit skipped findings (local charts) from report output |
 | `checker.max_age_months` | `--max-age` | `HELMFILE_CHECKER_CHECKER_MAX_AGE_MONTHS` | int | `12` | Months since last chart update before flagged as unmaintained |
-| `checker.fail_on_outdated` | `--fail-on-outdated` | `HELMFILE_CHECKER_CHECKER_FAIL_ON_OUTDATED` | bool | `false` | Exit non-zero when outdated or unmaintained charts are found |
 | `checker.concurrent_requests` | `--concurrent` | `HELMFILE_CHECKER_CHECKER_CONCURRENT_REQUESTS` | int | `5` | Number of concurrent repository index fetches |
 | `repositories.timeout_seconds` | `--timeout` | `HELMFILE_CHECKER_REPOSITORIES_TIMEOUT_SECONDS` | int | `30` | HTTP timeout in seconds for repository requests |
 | `repositories.skip_tls_verify` | — | `HELMFILE_CHECKER_REPOSITORIES_SKIP_TLS_VERIFY` | bool | `false` | Skip TLS certificate verification (not recommended) |
@@ -238,8 +256,8 @@ hdc check <helmfile-path> [flags]
 Flags:
   -o, --output string        Output format: json, markdown, html (default "markdown")
       --output-file string   Write report to file instead of stdout
+      --ignore-skipped       Omit skipped findings from report (default false)
       --max-age int          Max chart age in months (default 12)
-      --fail-on-outdated     Exit non-zero if issues found
       --concurrent int       Concurrent repo queries (default 5)
       --timeout int          Request timeout in seconds (default 30)
 
