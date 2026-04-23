@@ -34,13 +34,42 @@ type jsonWriter struct {
 	ignoreSkipped bool
 }
 
+type jsonReport struct {
+	Summary struct {
+		Total    int `json:"total"`
+		OK       int `json:"ok"`
+		Warnings int `json:"warnings"`
+		Errors   int `json:"errors"`
+		Skipped  int `json:"skipped"`
+	} `json:"summary"`
+	Findings []models.Finding `json:"findings"`
+}
+
 func (j *jsonWriter) Write(w io.Writer, result *models.Result) error {
 	findings := j.filterFindings(result.Findings)
+
+	report := jsonReport{}
+	report.Findings = findings
+
+	// Calculate summary
+	for _, f := range result.Findings { // Use original findings for summary, not filtered
+		report.Summary.Total++
+		switch f.Status {
+		case models.StatusOK:
+			report.Summary.OK++
+		case models.StatusOutdated:
+			report.Summary.Warnings++
+		case models.StatusUnmaintained, models.StatusUnreachable:
+			report.Summary.Errors++
+		case models.StatusSkipped:
+			report.Summary.Skipped++
+		}
+	}
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 
-	if err := enc.Encode(findings); err != nil {
+	if err := enc.Encode(report); err != nil {
 		return fmt.Errorf("failed to write json report: %w", err)
 	}
 
@@ -80,6 +109,11 @@ func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
 		return fmt.Errorf("failed to write markdown report: %w", err)
 	}
 
+	// Add summary section
+	if err := m.writeSummary(w, result); err != nil {
+		return err
+	}
+
 	findings := m.filterFindings(result.Findings)
 	for _, f := range findings {
 		icon := statusIcon[f.Status]
@@ -101,6 +135,47 @@ func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
 		if _, err := fmt.Fprintln(w); err != nil {
 			return fmt.Errorf("failed to write markdown report: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (m *markdownWriter) writeSummary(w io.Writer, result *models.Result) error {
+	total := len(result.Findings)
+	ok := 0
+	warnings := 0
+	errors := 0
+	skipped := 0
+
+	for _, f := range result.Findings {
+		switch f.Status {
+		case models.StatusOK:
+			ok++
+		case models.StatusOutdated:
+			warnings++
+		case models.StatusUnmaintained, models.StatusUnreachable:
+			errors++
+		case models.StatusSkipped:
+			skipped++
+		}
+	}
+
+	summary := fmt.Sprintf("**Summary:** %d releases checked", total)
+	if ok > 0 {
+		summary += fmt.Sprintf(", %d ✅ OK", ok)
+	}
+	if warnings > 0 {
+		summary += fmt.Sprintf(", %d ⚠️ warnings", warnings)
+	}
+	if errors > 0 {
+		summary += fmt.Sprintf(", %d ❌ errors", errors)
+	}
+	if skipped > 0 && !m.ignoreSkipped {
+		summary += fmt.Sprintf(", %d ⏭️ skipped", skipped)
+	}
+
+	if _, err := fmt.Fprintf(w, "%s\n\n", summary); err != nil {
+		return fmt.Errorf("failed to write markdown summary: %w", err)
 	}
 
 	return nil
@@ -129,6 +204,9 @@ type htmlWriter struct {
 func (h *htmlWriter) Write(w io.Writer, result *models.Result) error {
 	findings := h.filterFindings(result.Findings)
 
+	// Generate summary
+	summaryHTML := h.generateSummaryHTML(result)
+
 	rows := &strings.Builder{}
 	for _, f := range findings {
 		style := ""
@@ -149,19 +227,58 @@ func (h *htmlWriter) Write(w io.Writer, result *models.Result) error {
 <head><meta charset="utf-8"><title>HDC Dependency Report</title></head>
 <body>
 <h1>HDC Dependency Report</h1>
+%s
 <table border="1" cellpadding="4" cellspacing="0">
 <thead><tr><th>Release</th><th>Chart</th><th>Current</th><th>Latest</th><th>Status</th><th>Message</th></tr></thead>
 <tbody>
 %s</tbody>
 </table>
 </body>
-</html>`, rows.String())
+</html>`, summaryHTML, rows.String())
 
 	if _, err := fmt.Fprint(w, html); err != nil {
 		return fmt.Errorf("failed to write html report: %w", err)
 	}
 
 	return nil
+}
+
+func (h *htmlWriter) generateSummaryHTML(result *models.Result) string {
+	total := len(result.Findings)
+	ok := 0
+	warnings := 0
+	errors := 0
+	skipped := 0
+
+	for _, f := range result.Findings {
+		switch f.Status {
+		case models.StatusOK:
+			ok++
+		case models.StatusOutdated:
+			warnings++
+		case models.StatusUnmaintained, models.StatusUnreachable:
+			errors++
+		case models.StatusSkipped:
+			skipped++
+		}
+	}
+
+	summary := fmt.Sprintf("<p><strong>Summary:</strong> %d releases checked", total)
+	if ok > 0 {
+		summary += fmt.Sprintf(", %d ✅ OK", ok)
+	}
+	if warnings > 0 {
+		summary += fmt.Sprintf(", %d ⚠️ warnings", warnings)
+	}
+	if errors > 0 {
+		summary += fmt.Sprintf(", %d ❌ errors", errors)
+	}
+	if skipped > 0 && !h.ignoreSkipped {
+		summary += fmt.Sprintf(", %d ⏭️ skipped", skipped)
+	}
+	summary += "</p>"
+
+	return summary
 }
 
 func (h *htmlWriter) filterFindings(findings []models.Finding) []models.Finding {

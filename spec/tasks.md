@@ -35,8 +35,8 @@
 - [x] 5.2 Implement Markdown report writer
 - [x] 5.3 Implement HTML report writer
 - [x] 5.4 Write report tests (`report_test.go`)
-- [ ] 5.5 Add `ignore_skipped` filtering so skipped findings are omitted from JSON, Markdown, and HTML output when enabled
-- [ ] 5.6 Add warning and error summary counts to CLI-facing output while preserving existing status-specific visual indicators
+- [x] 5.5 Add `ignore_skipped` filtering so skipped findings are omitted from JSON, Markdown, and HTML output when enabled
+- [x] 5.6 Add warning and error summary counts to CLI-facing output while preserving existing status-specific visual indicators
 
 ## 6. CLI Wiring (US-006)
 - [x] 6.1 Implement root command with Cobra and global flags (`cmd/main.go`)

@@ -38,6 +38,10 @@ func TestWrite_JSON(t *testing.T) {
 	require.NoError(t, w.Write(&buf, testResult))
 
 	out := buf.String()
+	assert.Contains(t, out, `"summary"`)
+	assert.Contains(t, out, `"findings"`)
+	assert.Contains(t, out, `"total": 1`)
+	assert.Contains(t, out, `"warnings": 1`)
 	assert.Contains(t, out, `"LatestVersion"`)
 	assert.Contains(t, out, "17.0.0")
 }
@@ -51,6 +55,7 @@ func TestWrite_Markdown(t *testing.T) {
 
 	out := buf.String()
 	assert.Contains(t, out, "# HDC Dependency Report")
+	assert.Contains(t, out, "**Summary:** 1 releases checked, 1 ⚠️ warnings")
 	assert.Contains(t, out, "⚠️ redis (bitnami/redis)")
 	assert.Contains(t, out, "Version: 16.13.0 → 17.0.0")
 	assert.Contains(t, out, "newer version 17.0.0 available")
@@ -65,6 +70,7 @@ func TestWrite_HTML(t *testing.T) {
 
 	out := buf.String()
 	assert.True(t, strings.HasPrefix(out, "<!DOCTYPE html>"))
+	assert.Contains(t, out, "<strong>Summary:</strong> 1 releases checked, 1 ⚠️ warnings")
 	assert.Contains(t, out, "redis")
 	assert.Contains(t, out, "17.0.0")
 }
@@ -136,6 +142,12 @@ func TestWrite_JSON_IgnoreSkipped(t *testing.T) {
 	require.NoError(t, w.Write(&buf, resultWithSkipped))
 
 	out := buf.String()
+	// Summary should include all findings
+	assert.Contains(t, out, `"total": 3`)
+	assert.Contains(t, out, `"ok": 1`)
+	assert.Contains(t, out, `"warnings": 1`)
+	assert.Contains(t, out, `"skipped": 1`)
+	// Findings array should exclude skipped
 	assert.Contains(t, out, `"Status": "ok"`)
 	assert.NotContains(t, out, `"Status": "skipped"`)
 	assert.Contains(t, out, `"Status": "outdated"`)
