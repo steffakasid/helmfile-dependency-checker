@@ -79,8 +79,8 @@ func newCheckCmd(cfgFile string) *cobra.Command {
 
 	cmd.Flags().StringP("output", "o", "markdown", "output format (json, markdown, html)")
 	cmd.Flags().String("output-file", "", "write report to file instead of stdout")
+	cmd.Flags().Bool("ignore-skipped", false, "omit skipped releases from report output")
 	cmd.Flags().Int("max-age", 12, "maximum chart age in months before flagged as unmaintained")
-	cmd.Flags().Bool("fail-on-outdated", false, "exit non-zero if any outdated or unmaintained charts are found")
 	cmd.Flags().Int("concurrent", 5, "number of concurrent repository queries")
 	cmd.Flags().Int("timeout", 30, "repository request timeout in seconds")
 
@@ -94,8 +94,8 @@ func bindCheckFlags(cmd *cobra.Command, cfg *config.Config) error {
 	}{
 		{"output", "output.format"},
 		{"output-file", "output.file"},
+		{"ignore-skipped", "output.ignore_skipped"},
 		{"max-age", "checker.max_age_months"},
-		{"fail-on-outdated", "checker.fail_on_outdated"},
 		{"concurrent", "checker.concurrent_requests"},
 		{"timeout", "repositories.timeout_seconds"},
 	}
@@ -108,8 +108,8 @@ func bindCheckFlags(cmd *cobra.Command, cfg *config.Config) error {
 
 	cfg.Output.Format = viper.GetString("output.format")
 	cfg.Output.File = viper.GetString("output.file")
+	cfg.Output.IgnoreSkipped = viper.GetBool("output.ignore_skipped")
 	cfg.Checker.MaxAgeMonths = viper.GetInt("checker.max_age_months")
-	cfg.Checker.FailOnOutdated = viper.GetBool("checker.fail_on_outdated")
 	cfg.Checker.ConcurrentRequests = viper.GetInt("checker.concurrent_requests")
 	cfg.Repositories.TimeoutSeconds = viper.GetInt("repositories.timeout_seconds")
 
@@ -141,7 +141,7 @@ func runCheck(helmfilePath string, cfg *config.Config) error {
 		return err
 	}
 
-	writer, err := report.New(cfg.Output.Format)
+	writer, err := report.New(cfg.Output.Format, cfg.Output.IgnoreSkipped)
 	if err != nil {
 		return err
 	}

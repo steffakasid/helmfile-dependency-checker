@@ -17,8 +17,9 @@ type Config struct {
 		Format string `mapstructure:"format"`
 	} `mapstructure:"log"`
 	Output struct {
-		Format string `mapstructure:"format"`
-		File   string `mapstructure:"file"`
+		Format        string `mapstructure:"format"`
+		File          string `mapstructure:"file"`
+		IgnoreSkipped bool   `mapstructure:"ignore_skipped"`
 	} `mapstructure:"output"`
 	Checker struct {
 		MaxAgeMonths       int  `mapstructure:"max_age_months"`

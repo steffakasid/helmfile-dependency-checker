@@ -25,13 +25,13 @@ var testResult = &models.Result{
 }
 
 func TestNew_InvalidFormat(t *testing.T) {
-	_, err := report.New("xml")
+	_, err := report.New("xml", false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported report format")
 }
 
 func TestWrite_JSON(t *testing.T) {
-	w, err := report.New("json")
+	w, err := report.New("json", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -43,7 +43,7 @@ func TestWrite_JSON(t *testing.T) {
 }
 
 func TestWrite_Markdown(t *testing.T) {
-	w, err := report.New("markdown")
+	w, err := report.New("markdown", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -57,7 +57,7 @@ func TestWrite_Markdown(t *testing.T) {
 }
 
 func TestWrite_HTML(t *testing.T) {
-	w, err := report.New("html")
+	w, err := report.New("html", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -82,7 +82,7 @@ var skippedResult = &models.Result{
 }
 
 func TestWrite_JSON_StatusSkipped(t *testing.T) {
-	w, err := report.New("json")
+	w, err := report.New("json", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -96,7 +96,7 @@ func TestWrite_JSON_StatusSkipped(t *testing.T) {
 }
 
 func TestWrite_Markdown_StatusSkipped(t *testing.T) {
-	w, err := report.New("markdown")
+	w, err := report.New("markdown", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -108,7 +108,7 @@ func TestWrite_Markdown_StatusSkipped(t *testing.T) {
 }
 
 func TestWrite_HTML_StatusSkipped(t *testing.T) {
-	w, err := report.New("html")
+	w, err := report.New("html", false)
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -119,4 +119,66 @@ func TestWrite_HTML_StatusSkipped(t *testing.T) {
 	assert.Contains(t, out, "./charts/mychart")
 	assert.Contains(t, out, "skipped")
 	assert.Contains(t, out, `style="color:#888;background:#f5f5f5"`)
+}
+func TestWrite_JSON_IgnoreSkipped(t *testing.T) {
+	w, err := report.New("json", true)
+	require.NoError(t, err)
+
+	resultWithSkipped := &models.Result{
+		Findings: []models.Finding{
+			{Status: models.StatusOK},
+			{Status: models.StatusSkipped},
+			{Status: models.StatusOutdated},
+		},
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, resultWithSkipped))
+
+	out := buf.String()
+	assert.Contains(t, out, `"Status": "ok"`)
+	assert.NotContains(t, out, `"Status": "skipped"`)
+	assert.Contains(t, out, `"Status": "outdated"`)
+}
+
+func TestWrite_Markdown_IgnoreSkipped(t *testing.T) {
+	w, err := report.New("markdown", true)
+	require.NoError(t, err)
+
+	resultWithSkipped := &models.Result{
+		Findings: []models.Finding{
+			{Release: models.Release{Name: "ok", Chart: "ok/chart"}, Status: models.StatusOK},
+			{Release: models.Release{Name: "skipped", Chart: "skipped/chart"}, Status: models.StatusSkipped},
+			{Release: models.Release{Name: "outdated", Chart: "outdated/chart"}, Status: models.StatusOutdated},
+		},
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, resultWithSkipped))
+
+	out := buf.String()
+	assert.Contains(t, out, "ok")
+	assert.NotContains(t, out, "skipped")
+	assert.Contains(t, out, "outdated")
+}
+
+func TestWrite_HTML_IgnoreSkipped(t *testing.T) {
+	w, err := report.New("html", true)
+	require.NoError(t, err)
+
+	resultWithSkipped := &models.Result{
+		Findings: []models.Finding{
+			{Release: models.Release{Name: "ok", Chart: "ok/chart"}, Status: models.StatusOK},
+			{Release: models.Release{Name: "skipped", Chart: "skipped/chart"}, Status: models.StatusSkipped},
+			{Release: models.Release{Name: "outdated", Chart: "outdated/chart"}, Status: models.StatusOutdated},
+		},
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, w.Write(&buf, resultWithSkipped))
+
+	out := buf.String()
+	assert.Contains(t, out, "ok")
+	assert.NotContains(t, out, "skipped")
+	assert.Contains(t, out, "outdated")
 }

@@ -15,14 +15,14 @@ type Writer interface {
 }
 
 // New returns a Writer for the given format ("json", "markdown", "html").
-func New(format string) (Writer, error) {
+func New(format string, ignoreSkipped bool) (Writer, error) {
 	switch strings.ToLower(format) {
 	case "json":
-		return &jsonWriter{}, nil
+		return &jsonWriter{ignoreSkipped: ignoreSkipped}, nil
 	case "markdown":
-		return &markdownWriter{}, nil
+		return &markdownWriter{ignoreSkipped: ignoreSkipped}, nil
 	case "html":
-		return &htmlWriter{}, nil
+		return &htmlWriter{ignoreSkipped: ignoreSkipped}, nil
 	default:
 		return nil, fmt.Errorf("unsupported report format %q", format)
 	}
@@ -30,22 +30,42 @@ func New(format string) (Writer, error) {
 
 // --- JSON ---
 
-type jsonWriter struct{}
+type jsonWriter struct {
+	ignoreSkipped bool
+}
 
 func (j *jsonWriter) Write(w io.Writer, result *models.Result) error {
+	findings := j.filterFindings(result.Findings)
+
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 
-	if err := enc.Encode(result.Findings); err != nil {
+	if err := enc.Encode(findings); err != nil {
 		return fmt.Errorf("failed to write json report: %w", err)
 	}
 
 	return nil
 }
 
+func (j *jsonWriter) filterFindings(findings []models.Finding) []models.Finding {
+	if !j.ignoreSkipped {
+		return findings
+	}
+
+	var filtered []models.Finding
+	for _, f := range findings {
+		if f.Status != models.StatusSkipped {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
+
 // --- Markdown ---
 
-type markdownWriter struct{}
+type markdownWriter struct {
+	ignoreSkipped bool
+}
 
 var statusIcon = map[models.Status]string{
 	models.StatusOK:           "✅",
@@ -60,7 +80,8 @@ func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
 		return fmt.Errorf("failed to write markdown report: %w", err)
 	}
 
-	for _, f := range result.Findings {
+	findings := m.filterFindings(result.Findings)
+	for _, f := range findings {
 		icon := statusIcon[f.Status]
 		if icon == "" {
 			icon = "❓"
@@ -85,13 +106,31 @@ func (m *markdownWriter) Write(w io.Writer, result *models.Result) error {
 	return nil
 }
 
+func (m *markdownWriter) filterFindings(findings []models.Finding) []models.Finding {
+	if !m.ignoreSkipped {
+		return findings
+	}
+
+	var filtered []models.Finding
+	for _, f := range findings {
+		if f.Status != models.StatusSkipped {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
+
 // --- HTML ---
 
-type htmlWriter struct{}
+type htmlWriter struct {
+	ignoreSkipped bool
+}
 
 func (h *htmlWriter) Write(w io.Writer, result *models.Result) error {
+	findings := h.filterFindings(result.Findings)
+
 	rows := &strings.Builder{}
-	for _, f := range result.Findings {
+	for _, f := range findings {
 		style := ""
 		if f.Status == models.StatusSkipped {
 			style = ` style="color:#888;background:#f5f5f5"`
@@ -123,4 +162,18 @@ func (h *htmlWriter) Write(w io.Writer, result *models.Result) error {
 	}
 
 	return nil
+}
+
+func (h *htmlWriter) filterFindings(findings []models.Finding) []models.Finding {
+	if !h.ignoreSkipped {
+		return findings
+	}
+
+	var filtered []models.Finding
+	for _, f := range findings {
+		if f.Status != models.StatusSkipped {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
 }

@@ -44,8 +44,8 @@
 - [x] 6.3 Implement `version` subcommand with ldflags injection
 - [x] 6.4 Wire config → parser → checker → report pipeline
 - [x] 6.5 Replace legacy `fail-on-outdated` behavior with severity-based exit code classification (`0` clean, `1` warnings only, `2` any errors)
-- [ ] 6.6 Add `--ignore-skipped` CLI flag and bind it with CLI-over-config precedence
-- [ ] 6.7 Remove `--fail-on-outdated` from CLI help, flag binding, and runtime behavior
+- [x] 6.6 Add `--ignore-skipped` CLI flag and bind it with CLI-over-config precedence
+- [x] 6.7 Remove `--fail-on-outdated` from CLI help, flag binding, and runtime behavior
 
 ## 7. Quality & Verification
 - [x] 7.1 Ensure all linting rules pass (`make lint`)
