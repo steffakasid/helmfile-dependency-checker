@@ -194,3 +194,40 @@ func TestWrite_HTML_IgnoreSkipped(t *testing.T) {
 	assert.NotContains(t, out, "skipped")
 	assert.Contains(t, out, "outdated")
 }
+
+func TestIgnoreSkipped_AffectsOutputOnly_NotExitCode(t *testing.T) {
+	// Test that ignore_skipped filters output but doesn't change exit code calculation
+	resultWithSkipped := &models.Result{
+		Findings: []models.Finding{
+			{Release: models.Release{Name: "ok", Chart: "ok/chart"}, Status: models.StatusOK},
+			{Release: models.Release{Name: "skipped", Chart: "skipped/chart"}, Status: models.StatusSkipped},
+			{Release: models.Release{Name: "outdated", Chart: "outdated/chart"}, Status: models.StatusOutdated},
+		},
+	}
+
+	// Exit code should be 1 (warnings only) regardless of ignore_skipped setting
+	assert.Equal(t, 1, resultWithSkipped.ExitCode())
+
+	// With ignore_skipped=false, all findings should be in output
+	w1, err := report.New("json", false)
+	require.NoError(t, err)
+	var buf1 bytes.Buffer
+	require.NoError(t, w1.Write(&buf1, resultWithSkipped))
+	out1 := buf1.String()
+	assert.Contains(t, out1, `"Status": "ok"`)
+	assert.Contains(t, out1, `"Status": "skipped"`)
+	assert.Contains(t, out1, `"Status": "outdated"`)
+
+	// With ignore_skipped=true, skipped findings should be filtered from output
+	w2, err := report.New("json", true)
+	require.NoError(t, err)
+	var buf2 bytes.Buffer
+	require.NoError(t, w2.Write(&buf2, resultWithSkipped))
+	out2 := buf2.String()
+	assert.Contains(t, out2, `"Status": "ok"`)
+	assert.NotContains(t, out2, `"Status": "skipped"`)
+	assert.Contains(t, out2, `"Status": "outdated"`)
+
+	// But exit code remains the same
+	assert.Equal(t, 1, resultWithSkipped.ExitCode())
+}
