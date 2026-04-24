@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -35,8 +36,10 @@ type Config struct {
 	} `mapstructure:"exclude"`
 }
 
-// InitConfig loads configuration from file, environment, and defaults.
+// Simplify InitConfig by relying on viper's direct unmarshaling capabilities
 func InitConfig(cfgFile string) (*Config, error) {
+	log.Printf("Config file path: %s", cfgFile)
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -50,13 +53,6 @@ func InitConfig(cfgFile string) (*Config, error) {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	viper.SetDefault("log.level", "info")
-	viper.SetDefault("log.format", "text")
-	viper.SetDefault("output.format", "markdown")
-	viper.SetDefault("checker.max_age_months", 12)
-	viper.SetDefault("checker.concurrent_requests", 5)
-	viper.SetDefault("repositories.timeout_seconds", 30)
-
 	if err := viper.ReadInConfig(); err != nil {
 		var configNotFound viper.ConfigFileNotFoundError
 		if !errors.As(err, &configNotFound) {
@@ -64,11 +60,27 @@ func InitConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("log.format", "text")
+	viper.SetDefault("output.format", "markdown")
+	viper.SetDefault("checker.max_age_months", 12)
+	viper.SetDefault("checker.concurrent_requests", 5)
+	viper.SetDefault("repositories.timeout_seconds", 30)
+
+	log.Printf("Pre-Unmarshal log.level: %s", viper.Get("log.level"))
+	log.Printf("Pre-Unmarshal log.format: %s", viper.Get("log.format"))
+	log.Printf("Pre-Unmarshal output.format: %s", viper.Get("output.format"))
+	log.Printf("Pre-Unmarshal checker.max_age_months: %d", viper.Get("checker.max_age_months"))
+	log.Printf("Pre-Unmarshal checker.concurrent_requests: %d", viper.Get("checker.concurrent_requests"))
+	log.Printf("Pre-Unmarshal repositories.timeout_seconds: %d", viper.Get("repositories.timeout_seconds"))
+
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	log.Printf("Using config file: %s", viper.ConfigFileUsed())
+	log.Printf("Config values: %+v", cfg)
 	return &cfg, nil
 }
 
@@ -97,4 +109,21 @@ func InitLogger(cfg *Config) {
 	}
 
 	slog.SetDefault(slog.New(handler))
+}
+
+// SetDefaultConfig sets default values for configuration fields.
+func SetDefaultConfig() {
+	viper.SetDefault("log.level", "info")
+	viper.SetDefault("log.format", "text")
+	viper.SetDefault("output.format", "markdown")
+	viper.SetDefault("checker.max_age_months", 12)
+	viper.SetDefault("checker.concurrent_requests", 5)
+	viper.SetDefault("repositories.timeout_seconds", 30)
+
+	log.Printf("Default log.level: %s", viper.Get("log.level"))
+	log.Printf("Default log.format: %s", viper.Get("log.format"))
+	log.Printf("Default output.format: %s", viper.Get("output.format"))
+	log.Printf("Default checker.max_age_months: %d", viper.Get("checker.max_age_months"))
+	log.Printf("Default checker.concurrent_requests: %d", viper.Get("checker.concurrent_requests"))
+	log.Printf("Default repositories.timeout_seconds: %d", viper.Get("repositories.timeout_seconds"))
 }
