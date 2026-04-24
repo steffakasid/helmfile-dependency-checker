@@ -15,7 +15,7 @@ releases:
   - name: postgresql
     namespace: {{ .Values.dbNamespace | default "database" }}
     chart: bitnami/postgresql
-    version: 11.6.0
+    version: 18.6.2
     set:
       - name: auth.postgresPassword
         value: {{ requiredEnv "DB_PASSWORD" }}
