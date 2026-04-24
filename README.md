@@ -1,5 +1,9 @@
 # HDC - Helmfile Dependency Checker
 
+[![Go Test](https://github.com/steffenrumpf/hdc/actions/workflows/test.yml/badge.svg)](https://github.com/steffenrumpf/hdc/actions/workflows/test.yml)
+[![goreleaser](https://github.com/steffenrumpf/hdc/actions/workflows/release.yml/badge.svg)](https://github.com/steffenrumpf/hdc/actions/workflows/release.yml)
+[![CodeQL](https://github.com/steffenrumpf/hdc/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/steffenrumpf/hdc/actions/workflows/codeql-analysis.yml)
+
 A standalone CLI tool that verifies Helm chart dependencies declared in helmfiles are up-to-date and actively maintained. No Helm or helmfile binaries required.
 
 ## Features
