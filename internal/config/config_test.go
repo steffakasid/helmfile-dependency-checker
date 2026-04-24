@@ -40,3 +40,16 @@ func TestInitLogger_DoesNotPanic(t *testing.T) {
 
 	assert.NotPanics(t, func() { config.InitLogger(cfg) })
 }
+
+func TestSetDefaultConfig(t *testing.T) {
+	viper.Reset()
+
+	config.SetDefaultConfig()
+
+	assert.Equal(t, "info", viper.Get("log.level"))
+	assert.Equal(t, "text", viper.Get("log.format"))
+	assert.Equal(t, "markdown", viper.Get("output.format"))
+	assert.Equal(t, 12, viper.Get("checker.max_age_months"))
+	assert.Equal(t, 5, viper.Get("checker.concurrent_requests"))
+	assert.Equal(t, 30, viper.Get("repositories.timeout_seconds"))
+}
