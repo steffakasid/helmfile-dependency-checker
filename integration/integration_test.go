@@ -16,7 +16,7 @@ import (
 // TestCLI_Precedence_ConfigFileVsFlags tests that CLI flags take precedence over config file settings
 func TestCLI_Precedence_ConfigFileVsFlags(t *testing.T) {
 	// Build the binary
-	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "../cmd")
+	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "./cmd")
 	require.NoError(t, buildCmd.Run(), "failed to build test binary")
 	defer os.Remove("hdc-test")
 
@@ -59,7 +59,7 @@ checker:
 // TestCLI_Precedence_FlagsVsDefaults tests that CLI flags override defaults
 func TestCLI_Precedence_FlagsVsDefaults(t *testing.T) {
 	// Build the binary
-	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "../cmd")
+	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "./cmd")
 	require.NoError(t, buildCmd.Run(), "failed to build test binary")
 	defer os.Remove("hdc-test")
 
@@ -106,7 +106,7 @@ func TestCLI_Precedence_FlagsVsDefaults(t *testing.T) {
 // TestCLI_LegacyFlagsRejected tests that removed legacy flags are properly rejected
 func TestCLI_LegacyFlagsRejected(t *testing.T) {
 	// Build the binary
-	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "../cmd")
+	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "./cmd")
 	require.NoError(t, buildCmd.Run(), "failed to build test binary")
 	defer os.Remove("hdc-test")
 
@@ -124,7 +124,7 @@ func TestCLI_LegacyFlagsRejected(t *testing.T) {
 // TestCLI_ConfigFileNotFound tests that invalid config file content is handled
 func TestCLI_ConfigFileInvalid(t *testing.T) {
 	// Build the binary
-	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "../cmd")
+	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "/Users/steffenrumpf/Projects/steffakasid/helmfile-dependency-checker/cmd")
 	require.NoError(t, buildCmd.Run(), "failed to build test binary")
 	defer os.Remove("hdc-test")
 
@@ -150,7 +150,7 @@ func TestCLI_ConfigFileInvalid(t *testing.T) {
 // TestCLI_OutputFile tests that --output-file flag works correctly
 func TestCLI_OutputFile(t *testing.T) {
 	// Build the binary
-	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "../cmd")
+	buildCmd := exec.Command("go", "build", "-o", "hdc-test", "./cmd")
 	require.NoError(t, buildCmd.Run(), "failed to build test binary")
 	defer os.Remove("hdc-test")
 
