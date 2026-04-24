@@ -27,7 +27,7 @@ builds:
 
 brews:
   - name: hdc
-    tap:
+    repository:
       owner: steffenrumpf
       name: homebrew-tap
       token: "{{ .Env.GITHUB_TOKEN }}"
@@ -36,7 +36,7 @@ brews:
       name: goreleaserbot
       email: bot@goreleaser.com
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
-    folder: Formula
+    directory: Formula
     caveats: |
       HDC is a standalone CLI tool for checking Helm chart dependencies.
 
