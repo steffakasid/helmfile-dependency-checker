@@ -33,10 +33,10 @@ test-integration:
 	go test -tags=integration -v ./integration
 
 lint:
-	golangci-lint run
+	go tool golangci-lint run
 
 lint-fix:
-	golangci-lint run --fix
+	go tool golangci-lint run --fix
 
 clean:
 	rm -rf dist/
