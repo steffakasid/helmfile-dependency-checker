@@ -55,6 +55,7 @@
 - [x] 7.5 Add test coverage for exit code classification (`0`, `1`, `2`) and severity mapping (`outdated` warning, `unmaintained`/`unreachable` error)
 - [x] 7.6 Add test coverage for `ignore_skipped` filtering and confirm skipped findings never affect exit codes
 - [x] 7.7 Add test coverage for CLI-over-config precedence and confirm removed legacy flags/config keys are rejected or absent
+- [x] 7.8 Harden CLI integration tests to separate stdout/stderr capture, clean test binaries, and align output expectations with config-driven defaults
 
 ## 8. Documentation
 - [x] 8.1 Update README.md with usage instructions and examples

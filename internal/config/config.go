@@ -36,7 +36,7 @@ type Config struct {
 	} `mapstructure:"exclude"`
 }
 
-// Simplify InitConfig by relying on viper's direct unmarshaling capabilities
+// Simplify InitConfig by relying on viper's direct unmarshaling capabilities.
 func InitConfig(cfgFile string) (*Config, error) {
 	log.Printf("Config file path: %s", cfgFile)
 
