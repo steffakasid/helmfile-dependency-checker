@@ -7,7 +7,7 @@
 - [x] 1.4 Configure mockery and generate mocks for all interfaces
 - [x] 1.5 Implement Config struct and InitConfig/InitLogger (`internal/config`)
 - [x] 1.6 Write config tests (`config_test.go`)
-- [ ] 1.7 Add `output.ignore_skipped` to config structs, defaults, and bindings
+- [x] 1.7 Add `output.ignore_skipped` to config structs, defaults, and bindings
 - [x] 1.8 Remove legacy `checker.fail_on_outdated` config support and references
 
 ## 2. Helmfile Parsing (US-001)
