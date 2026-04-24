@@ -1,0 +1,46 @@
+{
+  "extends": [
+    "config:recommended"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "matchFileNames": [
+        "!.github/**"
+      ],
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
+    },
+    {
+      "matchDatasources": [
+        "golang-version"
+      ],
+      "rangeStrategy": "bump"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.*go$/"
+      ],
+      "matchStrings": [
+        "//go:generate go run (?<depName>.+?)@(?<currentValue>.*?)\\n$"
+      ],
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.github\\/workflows\\/.*\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "(?<depName>go)-version: (?<currentValue>.*?)\\n"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
+    }
+  ]
+}
