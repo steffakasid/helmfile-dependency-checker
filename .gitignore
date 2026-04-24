@@ -12,6 +12,7 @@ dist/
 hdc-test
 test-output.log
 coverage.out
+.golangci-lint-cache
 
 # Test binary
 *.test
