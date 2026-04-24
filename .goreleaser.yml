@@ -1,3 +1,4 @@
+---
 version: 2
 
 project_name: hdc
@@ -30,7 +31,7 @@ brews:
     repository:
       owner: steffenrumpf
       name: homebrew-tap
-      token: "{{ .Env.GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     url_template: "https://github.com/steffenrumpf/hdc/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: goreleaserbot
@@ -77,3 +78,8 @@ changelog:
       - "^chore"
       - "^style"
       - "^ci"
+
+release:
+  github:
+    owner: steffenrumpf
+    name: hdc
