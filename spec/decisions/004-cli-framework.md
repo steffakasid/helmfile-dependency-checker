@@ -25,9 +25,9 @@ hdc version
 ### Example Flags
 - `--output, -o`: Output format (json, markdown, html)
 - `--max-age`: Maximum chart age in months (default: 12)
-- `--fail-on-outdated`: Exit with error if outdated charts found
+- `--ignore-skipped`: Omit skipped findings from report output
 - `--concurrent, -c`: Number of concurrent repository queries
-- `--verbose, -v`: Verbose logging
+- `--log-level`: Log verbosity (debug, info, warn, error)
 
 ## Consequences
 

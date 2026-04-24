@@ -25,10 +25,10 @@ log:
 output:
   format: markdown   # json, markdown, html
   file: ""          # empty = stdout
+  ignore_skipped: false
 
 checker:
   max_age_months: 12
-  fail_on_outdated: false
   concurrent_requests: 5
 
 repositories:
@@ -48,12 +48,12 @@ type Config struct {
         Format string
     }
     Output struct {
-        Format string
-        File   string
+        Format        string
+        File          string
+        IgnoreSkipped bool
     }
     Checker struct {
         MaxAgeMonths       int
-        FailOnOutdated     bool
         ConcurrentRequests int
     }
     Repositories struct {
@@ -77,8 +77,8 @@ type Config struct {
 // Command flags
 --output, -o         → output.format
 --output-file        → output.file
+--ignore-skipped     → output.ignore_skipped
 --max-age            → checker.max_age_months
---fail-on-outdated   → checker.fail_on_outdated
 --concurrent         → checker.concurrent_requests
 --timeout            → repositories.timeout_seconds
 --skip-tls-verify    → repositories.skip_tls_verify

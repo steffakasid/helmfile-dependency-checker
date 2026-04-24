@@ -267,9 +267,19 @@ Global Flags:
       --log-format string    Log format: text, json (default "text")
 ```
 
+## Exit Codes
+
+HDC uses severity-based exit codes for CI/CD integration:
+
+- **Exit code 0**: No issues found (all charts are up-to-date and actively maintained)
+- **Exit code 1**: Warnings only (some charts are outdated but maintained)
+- **Exit code 2**: Errors found (some charts are unmaintained or unreachable)
+
+**Note:** Skipped findings (local charts) never affect the exit code.
+
 ## CI/CD Integration Examples
 
-HDC is designed for pipeline use. The `--fail-on-outdated` flag causes a non-zero exit code when outdated or unmaintained charts are detected, making it easy to gate deployments.
+HDC is designed for pipeline use. Exit codes enable easy integration with CI systems to gate deployments based on severity.
 
 ### GitLab CI
 
@@ -280,11 +290,22 @@ check-helm-dependencies:
   before_script:
     - go install github.com/steffenrumpf/hdc/cmd@latest
   script:
-    - hdc check helmfile.yaml --fail-on-outdated -o json --output-file hdc-report.json
+    - hdc check helmfile.yaml -o json --output-file hdc-report.json
   artifacts:
     paths:
       - hdc-report.json
     when: always
+  allow_failure: true
+```
+
+To fail on warnings (outdated charts), add to your CI/CD script:
+```bash
+hdc check helmfile.yaml -o json --output-file hdc-report.json
+EXIT_CODE=$?
+if [ $EXIT_CODE -ge 1 ]; then
+  echo "Dependency issues found (exit code: $EXIT_CODE)"
+  exit $EXIT_CODE
+fi
 ```
 
 ### GitHub Actions
@@ -309,7 +330,7 @@ jobs:
           sudo mv hdc /usr/local/bin/
 
       - name: Check dependencies
-        run: hdc check helmfile.yaml --fail-on-outdated -o markdown --output-file report.md
+        run: hdc check helmfile.yaml -o markdown --output-file report.md
 
       - name: Upload report
         if: always()
@@ -317,6 +338,14 @@ jobs:
         with:
           name: hdc-report
           path: report.md
+
+      - name: Fail on errors (but allow warnings)
+        run: |
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 2 ]; then
+            echo "❌ Errors found in dependencies"
+            exit 1
+          fi
 ```
 
 ### Generic Shell (any CI system)
@@ -329,12 +358,24 @@ set -euo pipefail
 curl -sLo hdc.tar.gz https://github.com/steffenrumpf/hdc/releases/latest/download/hdc_linux_amd64.tar.gz
 tar xzf hdc.tar.gz && chmod +x hdc
 
-# Run check — exits non-zero on outdated charts
+# Run check
 ./hdc check helmfile.yaml \
-  --fail-on-outdated \
   --max-age 6 \
   -o json \
   --output-file hdc-report.json
+
+EXIT_CODE=$?
+echo "HDC exit code: $EXIT_CODE"
+
+# 0 = no issues, 1 = warnings, 2 = errors
+if [ $EXIT_CODE -eq 2 ]; then
+  echo "❌ Errors found - failing build"
+  exit 1
+elif [ $EXIT_CODE -eq 1 ]; then
+  echo "⚠️  Warnings found but build continues"
+fi
+
+echo "✅ Check complete"
 ```
 
 ### Scheduled Reporting (no failure on outdated)

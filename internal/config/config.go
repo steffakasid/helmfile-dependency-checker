@@ -22,9 +22,8 @@ type Config struct {
 		IgnoreSkipped bool   `mapstructure:"ignore_skipped"`
 	} `mapstructure:"output"`
 	Checker struct {
-		MaxAgeMonths       int  `mapstructure:"max_age_months"`
-		FailOnOutdated     bool `mapstructure:"fail_on_outdated"`
-		ConcurrentRequests int  `mapstructure:"concurrent_requests"`
+		MaxAgeMonths       int `mapstructure:"max_age_months"`
+		ConcurrentRequests int `mapstructure:"concurrent_requests"`
 	} `mapstructure:"checker"`
 	Repositories struct {
 		TimeoutSeconds int  `mapstructure:"timeout_seconds"`

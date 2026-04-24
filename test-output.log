@@ -1,27 +1,27 @@
 	github.com/steffenrumpf/hdc/cmd		coverage: 0.0% of statements
 === RUN   TestProperty10_IsLocalChart_WithPathPrefix
-    checker_property_test.go:17: [rapid] OK, passed 100 tests (4.509083ms)
+    checker_property_test.go:17: [rapid] OK, passed 100 tests (4.173708ms)
 --- PASS: TestProperty10_IsLocalChart_WithPathPrefix (0.00s)
 === RUN   TestProperty10_IsLocalChart_WithoutPathPrefix
-    checker_property_test.go:30: [rapid] OK, passed 100 tests (4.282917ms)
+    checker_property_test.go:30: [rapid] OK, passed 100 tests (3.184917ms)
 --- PASS: TestProperty10_IsLocalChart_WithoutPathPrefix (0.00s)
 === RUN   TestProperty13_IsOCIRepo_WithOCIPrefix
-    checker_property_test.go:47: [rapid] OK, passed 100 tests (8.566334ms)
+    checker_property_test.go:47: [rapid] OK, passed 100 tests (7.632208ms)
 --- PASS: TestProperty13_IsOCIRepo_WithOCIPrefix (0.01s)
 === RUN   TestProperty13_IsOCIRepo_WithoutOCIPrefix
-    checker_property_test.go:59: [rapid] OK, passed 100 tests (8.00325ms)
+    checker_property_test.go:59: [rapid] OK, passed 100 tests (7.774792ms)
 --- PASS: TestProperty13_IsOCIRepo_WithoutOCIPrefix (0.01s)
 === RUN   TestProperty15_IsOCIFromFlag_WithFlagSet
-    checker_property_test.go:77: [rapid] OK, passed 100 tests (11.425959ms)
+    checker_property_test.go:77: [rapid] OK, passed 100 tests (8.64275ms)
 --- PASS: TestProperty15_IsOCIFromFlag_WithFlagSet (0.01s)
 === RUN   TestProperty15_IsOCIFromFlag_WithFlagUnset
-    checker_property_test.go:90: [rapid] OK, passed 100 tests (9.993458ms)
+    checker_property_test.go:90: [rapid] OK, passed 100 tests (7.873125ms)
 --- PASS: TestProperty15_IsOCIFromFlag_WithFlagUnset (0.01s)
 === RUN   TestProperty16_ResultSeverityClassification
-    checker_property_test.go:111: [rapid] OK, passed 100 tests (3.797291ms)
+    checker_property_test.go:111: [rapid] OK, passed 100 tests (3.357042ms)
 --- PASS: TestProperty16_ResultSeverityClassification (0.00s)
 === RUN   TestProperty17_ExitCodeCalculation
-    checker_property_test.go:169: [rapid] OK, passed 100 tests (4.867833ms)
+    checker_property_test.go:169: [rapid] OK, passed 100 tests (3.723375ms)
 --- PASS: TestProperty17_ExitCodeCalculation (0.00s)
 === RUN   TestProperty16_OCIFromFlag_UsesSameLogic
     checker_property_test.go:223: Property 16 is covered by unit tests TestCheck_OCI_Repository_With_Flag
@@ -33,7 +33,7 @@
 === RUN   TestCheck_Unmaintained
 --- PASS: TestCheck_Unmaintained (0.00s)
 === RUN   TestCheck_Unreachable
-2026/04/22 22:09:14 WARN failed to fetch repository index repo=bitnami error="connection refused"
+2026/04/24 20:12:27 WARN failed to fetch repository index repo=bitnami error="connection refused"
 --- PASS: TestCheck_Unreachable (0.00s)
 === RUN   TestCheck_ExcludedChart
 --- PASS: TestCheck_ExcludedChart (0.00s)
@@ -70,7 +70,7 @@
 === RUN   TestCheckOCIRelease_Outdated
 --- PASS: TestCheckOCIRelease_Outdated (0.00s)
 === RUN   TestCheckOCIRelease_Unreachable
-2026/04/22 22:09:14 WARN failed to fetch OCI tags url=oci://registry.example.com/charts/myapp error="connection refused"
+2026/04/24 20:12:27 WARN failed to fetch OCI tags url=oci://registry.example.com/charts/myapp error="connection refused"
 --- PASS: TestCheckOCIRelease_Unreachable (0.00s)
 === RUN   TestCheckOCIRelease_DirectChartField
 --- PASS: TestCheckOCIRelease_DirectChartField (0.00s)
@@ -156,7 +156,7 @@
 --- PASS: TestCheck_OCI_Repository_With_Flag (0.00s)
 PASS
 coverage: 92.1% of statements
-ok  	github.com/steffenrumpf/hdc/internal/checker	(cached)	coverage: 92.1% of statements
+ok  	github.com/steffenrumpf/hdc/internal/checker	1.741s	coverage: 92.1% of statements
 	github.com/steffenrumpf/hdc/internal/checker/mocks		coverage: 0.0% of statements
 === RUN   TestInitConfig_Defaults
 --- PASS: TestInitConfig_Defaults (0.00s)
@@ -166,7 +166,7 @@ ok  	github.com/steffenrumpf/hdc/internal/checker	(cached)	coverage: 92.1% of st
 --- PASS: TestInitLogger_DoesNotPanic (0.00s)
 PASS
 coverage: 85.7% of statements
-ok  	github.com/steffenrumpf/hdc/internal/config	1.471s	coverage: 85.7% of statements
+ok  	github.com/steffenrumpf/hdc/internal/config	1.938s	coverage: 85.7% of statements
 	github.com/steffenrumpf/hdc/internal/models		coverage: 0.0% of statements
 === RUN   TestParse_YAML
 --- PASS: TestParse_YAML (0.00s)
@@ -189,18 +189,18 @@ ok  	github.com/steffenrumpf/hdc/internal/config	1.471s	coverage: 85.7% of state
 === RUN   TestParse_ReadError
 --- PASS: TestParse_ReadError (0.00s)
 === RUN   TestParse_Integration_SubHelmfiles
---- PASS: TestParse_Integration_SubHelmfiles (0.00s)
+--- PASS: TestParse_Integration_SubHelmfiles (0.02s)
 === RUN   TestParse_MultiDocumentYAML
 --- PASS: TestParse_MultiDocumentYAML (0.00s)
 === RUN   TestParse_Integration_MultiDocumentYAML
---- PASS: TestParse_Integration_MultiDocumentYAML (0.00s)
+--- PASS: TestParse_Integration_MultiDocumentYAML (0.01s)
 === RUN   TestParse_Integration_OverlappingEntriesDetectedAsCircular
---- PASS: TestParse_Integration_OverlappingEntriesDetectedAsCircular (0.00s)
+--- PASS: TestParse_Integration_OverlappingEntriesDetectedAsCircular (0.01s)
 === RUN   TestParse_OCI_Repository
 --- PASS: TestParse_OCI_Repository (0.00s)
 PASS
 coverage: 89.2% of statements
-ok  	github.com/steffenrumpf/hdc/internal/parser	(cached)	coverage: 89.2% of statements
+ok  	github.com/steffenrumpf/hdc/internal/parser	1.488s	coverage: 89.2% of statements
 	github.com/steffenrumpf/hdc/internal/parser/mocks		coverage: 0.0% of statements
 === RUN   TestNew_InvalidFormat
 --- PASS: TestNew_InvalidFormat (0.00s)
@@ -226,13 +226,13 @@ ok  	github.com/steffenrumpf/hdc/internal/parser	(cached)	coverage: 89.2% of sta
 --- PASS: TestIgnoreSkipped_AffectsOutputOnly_NotExitCode (0.00s)
 PASS
 coverage: 87.2% of statements
-ok  	github.com/steffenrumpf/hdc/internal/report	1.895s	coverage: 87.2% of statements
+ok  	github.com/steffenrumpf/hdc/internal/report	1.808s	coverage: 87.2% of statements
 	github.com/steffenrumpf/hdc/internal/report/mocks		coverage: 0.0% of statements
 === RUN   TestProperty12_FilterSemverTags_OnlyValidSemver
-    client_property_test.go:20: [rapid] OK, passed 100 tests (8.297792ms)
+    client_property_test.go:20: [rapid] OK, passed 100 tests (8.183ms)
 --- PASS: TestProperty12_FilterSemverTags_OnlyValidSemver (0.01s)
 === RUN   TestProperty12_FilterSemverTags_CorrectLatest
-    client_property_test.go:71: [rapid] OK, passed 100 tests (8.665042ms)
+    client_property_test.go:71: [rapid] OK, passed 100 tests (7.75675ms)
 --- PASS: TestProperty12_FilterSemverTags_CorrectLatest (0.01s)
 === RUN   TestFetchIndex_Success
 --- PASS: TestFetchIndex_Success (0.00s)
@@ -306,5 +306,5 @@ ok  	github.com/steffenrumpf/hdc/internal/report	1.895s	coverage: 87.2% of state
     --- PASS: TestParseOCIURL_Errors/missing_repo_path_with_trailing_slash (0.00s)
 PASS
 coverage: 87.9% of statements
-ok  	github.com/steffenrumpf/hdc/internal/repository	(cached)	coverage: 87.9% of statements
+ok  	github.com/steffenrumpf/hdc/internal/repository	1.542s	coverage: 87.9% of statements
 	github.com/steffenrumpf/hdc/internal/repository/mocks		coverage: 0.0% of statements

@@ -25,6 +25,34 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
+brews:
+  - name: hdc
+    tap:
+      owner: steffenrumpf
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    url_template: "https://github.com/steffenrumpf/hdc/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    folder: Formula
+    caveats: |
+      HDC is a standalone CLI tool for checking Helm chart dependencies.
+
+      Quick start:
+        hdc check helmfile.yaml
+
+      For more information:
+        https://github.com/steffenrumpf/hdc
+    homepage: "https://github.com/steffenrumpf/hdc"
+    description: "Helmfile Dependency Checker - Verify Helm chart dependencies are up-to-date and actively maintained"
+    license: "Apache-2.0"
+    test: |
+      system "#{bin}/hdc", "version"
+    install: |
+      bin.install "hdc"
+
 checksum:
   name_template: checksums.txt
 
