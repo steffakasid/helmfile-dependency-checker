@@ -130,3 +130,10 @@
 - [x] 13.10 Add unit test: checker handles repositories defined with `oci: true` using the same OCI fetching logic
 - [x] 13.11 Add integration test with helmfile containing `oci: true` repository definitions
 - [x] 13.12 Ensure linting and all tests pass (`make lint && make test`)
+
+## 14. Repository Automation & Visibility
+- [x] 14.1 Align the Go test GitHub Actions workflow with the shared project pattern while keeping integration tests and linting
+- [x] 14.2 Align the release GitHub Actions workflow with the shared semantic-release and GoReleaser pattern
+- [x] 14.3 Add a CodeQL GitHub Actions workflow for Go analysis
+- [x] 14.4 Add a root `renovate.json` with the shared defaults and workflow Go version regex manager
+- [x] 14.5 Add linked GitHub Actions badges to `README.md` for test, release, and CodeQL workflow status
