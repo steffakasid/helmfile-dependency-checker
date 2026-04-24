@@ -57,6 +57,14 @@ func newRootCmd() *cobra.Command {
 }
 
 func newCheckCmd(cfgFile string) *cobra.Command {
+	var (
+		outputFile    string
+		ignoreSkipped bool
+		maxAge        int
+		concurrent    int
+		timeout       int
+	)
+
 	cmd := &cobra.Command{
 		Use:   "check <helmfile-path>",
 		Short: "Check helmfile dependencies for outdated or unmaintained charts",
@@ -77,12 +85,13 @@ func newCheckCmd(cfgFile string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("output", "o", "markdown", "output format (json, markdown, html)")
-	cmd.Flags().String("output-file", "", "write report to file instead of stdout")
-	cmd.Flags().Bool("ignore-skipped", false, "omit skipped releases from report output")
-	cmd.Flags().Int("max-age", 12, "maximum chart age in months before flagged as unmaintained")
-	cmd.Flags().Int("concurrent", 5, "number of concurrent repository queries")
-	cmd.Flags().Int("timeout", 30, "repository request timeout in seconds")
+	cmd.Flags().StringVarP(&cfgFile, "config", "c", "", "config file (default: .helmfile-checker.yaml)")
+	cmd.Flags().StringP("output", "o", "json", "output format (json, markdown, html)")
+	cmd.Flags().StringVarP(&outputFile, "output-file", "f", "", "write report to file instead of stdout")
+	cmd.Flags().BoolVarP(&ignoreSkipped, "ignore-skipped", "i", false, "omit skipped releases from report output")
+	cmd.Flags().IntVarP(&maxAge, "max-age", "m", 12, "maximum chart age in months before flagged as unmaintained")
+	cmd.Flags().IntVarP(&concurrent, "concurrent", "n", 5, "number of concurrent repository queries")
+	cmd.Flags().IntVarP(&timeout, "timeout", "t", 30, "repository request timeout in seconds")
 
 	return cmd
 }
