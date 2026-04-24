@@ -14,6 +14,15 @@
       "semanticCommitScope": "deps"
     },
     {
+      "description": "Do not update helmfile fixtures under testdata",
+      "matchFileNames": [
+        "testdata/**/helmfile*.yaml",
+        "testdata/**/helmfile*.yml",
+        "testdata/**/helmfile*.gotmpl"
+      ],
+      "enabled": false
+    },
+    {
       "matchDatasources": [
         "golang-version"
       ],

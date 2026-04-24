@@ -139,3 +139,4 @@
 - [x] 14.3 Add a CodeQL GitHub Actions workflow for Go analysis
 - [x] 14.4 Add a root `renovate.json` with the shared defaults and workflow Go version regex manager
 - [x] 14.5 Add linked GitHub Actions badges to `README.md` for test, release, and CodeQL workflow status
+- [x] 14.6 Exclude testdata helmfile fixtures from Renovate updates so test inputs stay stable
