@@ -8,6 +8,10 @@
 # Build artifacts
 dist/
 
+# Unignore the build/ source directory (overrides global gitignore)
+!build/
+!build/**
+
 # Test artifacts
 hdc-test
 test-output.log

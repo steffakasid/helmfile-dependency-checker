@@ -140,3 +140,7 @@
 - [x] 14.4 Add a root `renovate.json` with the shared defaults and workflow Go version regex manager
 - [x] 14.5 Add linked GitHub Actions badges to `README.md` for test, release, and CodeQL workflow status
 - [x] 14.6 Exclude testdata helmfile fixtures from Renovate updates so test inputs stay stable
+
+## 15. Docker Hub Image
+- [x] 15.1 Add `build/Dockerfile` using `cgr.dev/chainguard/static` base with the hdc binary as entrypoint
+- [x] 15.2 Add `dockers:` section to `.goreleaser.yml` publishing `docker.io/steffenrumpf/hdc` with version, major, major.minor, and latest tags

@@ -54,6 +54,16 @@ brews:
     install: |
       bin.install "hdc"
 
+dockers:
+  - goos: linux
+    goarch: amd64
+    image_templates:
+      - "docker.io/steffenrumpf/hdc:{{ .Tag }}"
+      - "docker.io/steffenrumpf/hdc:v{{ .Major }}"
+      - "docker.io/steffenrumpf/hdc:v{{ .Major }}.{{ .Minor }}"
+      - "docker.io/steffenrumpf/hdc:latest"
+    dockerfile: build/Dockerfile
+
 checksum:
   name_template: checksums.txt
 
