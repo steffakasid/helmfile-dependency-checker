@@ -1,0 +1,22 @@
+dir: '{{.InterfaceDir}}/mocks'
+structname: Mock{{.InterfaceName}}
+pkgname: mocks
+template: testify
+template-data:
+  unroll-variadic: true
+packages:
+  github.com/steffenrumpf/hdc/internal/checker:
+    interfaces:
+      Checker: {}
+      RepositoryClient: {}
+  github.com/steffenrumpf/hdc/internal/parser:
+    interfaces:
+      FileReader: {}
+      Parser: {}
+  github.com/steffenrumpf/hdc/internal/report:
+    interfaces:
+      Writer: {}
+  github.com/steffenrumpf/hdc/internal/repository:
+    interfaces:
+      Client: {}
+      HTTPClient: {}
