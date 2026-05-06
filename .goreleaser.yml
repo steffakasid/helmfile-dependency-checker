@@ -54,14 +54,16 @@ brews:
     install: |
       bin.install "hdc"
 
-dockers:
-  - goos: linux
-    goarch: amd64
-    image_templates:
-      - "docker.io/steffakasid/hdc:{{ .Tag }}"
-      - "docker.io/steffakasid/hdc:v{{ .Major }}"
-      - "docker.io/steffakasid/hdc:v{{ .Major }}.{{ .Minor }}"
-      - "docker.io/steffakasid/hdc:latest"
+dockers_v2:
+  - images:
+      - "docker.io/steffakasid/{{ .ProjectName }}"
+    tags:
+      - "{{ .Tag }}"
+      - "v{{ .Major }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - "latest"
+    platforms:
+      - linux/amd64
     dockerfile: build/Dockerfile
 
 checksum:
