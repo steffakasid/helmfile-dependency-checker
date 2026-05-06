@@ -29,10 +29,10 @@ builds:
 brews:
   - name: hdc
     repository:
-      owner: steffenrumpf
-      name: homebrew-tap
+      owner: steffakasid
+      name: homebrew-hdc
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    url_template: "https://github.com/steffenrumpf/hdc/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "https://github.com/steffakasid/helmfile-dependency-checker/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
@@ -45,8 +45,8 @@ brews:
         hdc check helmfile.yaml
 
       For more information:
-        https://github.com/steffenrumpf/hdc
-    homepage: "https://github.com/steffenrumpf/hdc"
+        https://github.com/steffakasid/helmfile-dependency-checker
+    homepage: "https://github.com/steffakasid/helmfile-dependency-checker"
     description: "Helmfile Dependency Checker - Verify Helm chart dependencies are up-to-date and actively maintained"
     license: "Apache-2.0"
     test: |
@@ -58,10 +58,10 @@ dockers:
   - goos: linux
     goarch: amd64
     image_templates:
-      - "docker.io/steffenrumpf/hdc:{{ .Tag }}"
-      - "docker.io/steffenrumpf/hdc:v{{ .Major }}"
-      - "docker.io/steffenrumpf/hdc:v{{ .Major }}.{{ .Minor }}"
-      - "docker.io/steffenrumpf/hdc:latest"
+      - "docker.io/steffakasid/hdc:{{ .Tag }}"
+      - "docker.io/steffakasid/hdc:v{{ .Major }}"
+      - "docker.io/steffakasid/hdc:v{{ .Major }}.{{ .Minor }}"
+      - "docker.io/steffakasid/hdc:latest"
     dockerfile: build/Dockerfile
 
 checksum:
@@ -91,5 +91,5 @@ changelog:
 
 release:
   github:
-    owner: steffenrumpf
-    name: hdc
+    owner: steffakasid
+    name: helmfile-dependency-checker
