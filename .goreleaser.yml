@@ -30,7 +30,7 @@ brews:
   - name: hdc
     repository:
       owner: steffakasid
-      name: homebrew-hdc
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     url_template: "https://github.com/steffakasid/helmfile-dependency-checker/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
