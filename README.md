@@ -405,3 +405,7 @@ make clean       # Remove build artifacts
 ## License
 
 See [LICENSE](LICENSE).
+
+## TODO
+
+- Publish Homebrew formula updates through one shared tap repository for all projects.

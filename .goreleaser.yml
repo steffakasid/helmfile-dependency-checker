@@ -47,7 +47,8 @@ brews:
       For more information:
         https://github.com/steffakasid/helmfile-dependency-checker
     homepage: "https://github.com/steffakasid/helmfile-dependency-checker"
-    description: "Helmfile Dependency Checker - Verify Helm chart dependencies are up-to-date and actively maintained"
+    description: >-
+      Check Helmfile chart dependencies for updates and maintenance status
     license: "Apache-2.0"
     test: |
       system "#{bin}/hdc", "version"
