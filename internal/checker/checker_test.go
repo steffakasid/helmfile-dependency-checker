@@ -149,7 +149,7 @@ func TestIsLocalChart_ReturnsFalse(t *testing.T) {
 		t.Run(tc.chart, func(t *testing.T) {
 			repos := []models.Repository{}
 			if tc.repoURL != "" {
-				repoName := strings.SplitN(tc.chart, "/", 2)[0]
+				repoName, _, _ := strings.Cut(tc.chart, "/")
 				repos = append(repos, models.Repository{Name: repoName, URL: tc.repoURL})
 			}
 

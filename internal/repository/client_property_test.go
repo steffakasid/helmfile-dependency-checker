@@ -24,7 +24,7 @@ func TestProperty12_FilterSemverTags_OnlyValidSemver(t *testing.T) {
 		var tags []string
 		var expectedCount int
 
-		for i := 0; i < numSemver; i++ {
+		for range numSemver {
 			major := rapid.IntRange(0, 99).Draw(t, "major")
 			minor := rapid.IntRange(0, 99).Draw(t, "minor")
 			patch := rapid.IntRange(0, 99).Draw(t, "patch")
@@ -46,7 +46,7 @@ func TestProperty12_FilterSemverTags_OnlyValidSemver(t *testing.T) {
 			"rc", "test", "foo.bar", "1.2", "v1", "abc.def.ghi",
 		}
 
-		for i := 0; i < numNonSemver; i++ {
+		for range numNonSemver {
 			tag := rapid.SampledFrom(nonSemverPatterns).Draw(t, "nonSemverTag")
 			tags = append(tags, tag)
 		}
@@ -81,7 +81,7 @@ func TestProperty12_FilterSemverTags_CorrectLatest(t *testing.T) {
 		var triples []triple
 		var tags []string
 
-		for i := 0; i < numSemver; i++ {
+		for range numSemver {
 			major := rapid.IntRange(0, 99).Draw(t, "major")
 			minor := rapid.IntRange(0, 99).Draw(t, "minor")
 			patch := rapid.IntRange(0, 99).Draw(t, "patch")
@@ -100,7 +100,7 @@ func TestProperty12_FilterSemverTags_CorrectLatest(t *testing.T) {
 
 		nonSemverPatterns := []string{"latest", "dev", "nightly", "main", "sha-abc123"}
 
-		for i := 0; i < numNonSemver; i++ {
+		for range numNonSemver {
 			tag := rapid.SampledFrom(nonSemverPatterns).Draw(t, "nonSemverTag")
 			tags = append(tags, tag)
 		}

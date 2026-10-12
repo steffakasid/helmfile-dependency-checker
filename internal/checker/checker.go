@@ -3,6 +3,7 @@ package checker
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -258,13 +259,7 @@ func (c *checker) isExcluded(rel models.Release) bool {
 }
 
 func (c *checker) isRepoExcluded(repoURL string) bool {
-	for _, ex := range c.cfg.ExcludeRepos {
-		if ex == repoURL {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(c.cfg.ExcludeRepos, repoURL)
 }
 
 // IsOCIRepo returns true if the repository URL uses the oci:// scheme.
@@ -331,12 +326,4 @@ func parseSemver(v string) []int {
 	}
 
 	return nums
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-
-	return b
 }

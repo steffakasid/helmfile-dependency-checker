@@ -201,7 +201,7 @@ func parseWwwAuthenticate(header, repo string) string {
 
 	params := make(map[string]string)
 
-	for _, part := range strings.Split(header, ",") {
+	for part := range strings.SplitSeq(header, ",") {
 		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
 		if len(kv) == 2 {
 			params[kv[0]] = strings.Trim(kv[1], "\"")
