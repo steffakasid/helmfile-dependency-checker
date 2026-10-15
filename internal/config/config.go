@@ -54,8 +54,8 @@ func InitConfig(cfgFile string) (*Config, error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
-		// only ignore ConfigFileNotFound other errors are returned
-		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok { //nolint:errcheck
+
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok { //nolint:errcheck // only ignore ConfigFileNotFound other errors are returned
 			return nil, fmt.Errorf("failed to read config: %w", err)
 		}
 	}
